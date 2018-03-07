@@ -19,6 +19,15 @@ import (
 
 const winWidth, winHeight int = 800, 600
 
+type gameState int
+
+const (
+	start gameState = iota
+	play
+)
+
+var state = start
+
 var nums = [][]byte{
 	{1, 1, 1,
 		1, 0, 1,
@@ -69,6 +78,10 @@ type paddle struct {
 	color color
 }
 
+func lerp(a float32, b float32, pct float32) float32 {
+	return a + pct*(b-a)
+}
+
 func drawNumber(pos pos, color color, size int, num int, pixels []byte) {
 	startX := int(pos.x) - (size*3)/2
 	startY := int(pos.y) - (size*5)/2
@@ -108,6 +121,9 @@ func (paddle *paddle) draw(pixels []byte) {
 			setPixel(startX+x, startY+y, paddle.color, pixels)
 		}
 	}
+
+	numX := lerp(paddle.x, getCenter().x, 0.2)
+	drawNumber(pos{numX, 35}, paddle.color, 10, paddle.score, pixels)
 }
 
 func getCenter() pos {
@@ -118,23 +134,37 @@ func (ball *ball) update(leftPaddle *paddle, rightPaddle *paddle, elapsedTime fl
 	ball.x += ball.xv * elapsedTime
 	ball.y += ball.yv * elapsedTime
 
-	if ball.y-ball.radius < 0 || ball.y+ball.radius > float32(winHeight) {
+	if ball.y-ball.radius < 0 {
 		ball.yv = -ball.yv
+		ball.y = 0 + ball.radius
 	}
 
-	if ball.x < 0 || ball.x > float32(winWidth) {
+	if ball.y+ball.radius > float32(winHeight) {
+		ball.yv = -ball.yv
+		ball.y = float32(winHeight) - ball.radius
+	}
+
+	if ball.x < 0 {
+		rightPaddle.score++
 		ball.pos = getCenter()
+		state = start
+	} else if ball.x > float32(winWidth) {
+		leftPaddle.score++
+		ball.pos = getCenter()
+		state = start
 	}
 
-	if ball.x < leftPaddle.x+leftPaddle.w/2 {
+	if ball.x-ball.radius < leftPaddle.x+leftPaddle.w/2 {
 		if ball.y > leftPaddle.y-leftPaddle.h/2 && ball.y < leftPaddle.y+leftPaddle.h/2 {
 			ball.xv = -ball.xv
+			ball.x = leftPaddle.x + leftPaddle.w/2.0 + ball.radius
 		}
 	}
 
-	if ball.x > rightPaddle.pos.x+rightPaddle.w/2 {
+	if ball.x+ball.radius > rightPaddle.pos.x+rightPaddle.w/2 {
 		if ball.y > rightPaddle.y-rightPaddle.h/2 && ball.y < rightPaddle.y+rightPaddle.h/2 {
 			ball.xv = -ball.xv
+			ball.x = rightPaddle.x - rightPaddle.w/2.0 - ball.radius
 		}
 	}
 }
@@ -228,14 +258,21 @@ func main() {
 				return
 			}
 		}
+		if state == play {
+			player1.update(keyState, elapsedTime)
+			player2.aiUpdate(&ball, elapsedTime)
+			ball.update(&player1, &player2, elapsedTime)
+		} else if state == start {
+			if keyState[sdl.SCANCODE_SPACE] != 0 {
+				if player1.score == 3 || player2.score == 3 {
+					player1.score = 0
+					player2.score = 0
+				}
+				state = play
+			}
+		}
+
 		clear(pixels)
-
-		drawNumber(getCenter(), color{255, 255, 255}, 20, 2, pixels)
-
-		player1.update(keyState, elapsedTime)
-		player2.aiUpdate(&ball, elapsedTime)
-		ball.update(&player1, &player2, elapsedTime)
-
 		player1.draw(pixels)
 		player2.draw(pixels)
 		ball.draw(pixels)
@@ -246,7 +283,7 @@ func main() {
 
 		elapsedTime = float32(time.Since(frameStart).Seconds())
 		if elapsedTime < .005 {
-			sdl.Delay(5 - uint32(elapsedTime/1000.0))
+			sdl.Delay(5 - uint32(elapsedTime*1000.0))
 			elapsedTime = float32(time.Since(frameStart).Seconds())
 		}
 	}
