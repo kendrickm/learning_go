@@ -1,5 +1,9 @@
 package main
 
+//Implement insertion sort
+//Implement collision detection
+//  Minimum translation vector
+
 import (
 	"fmt"
 	"image/png"
@@ -90,7 +94,7 @@ func (balloon *balloon) getCircle() (x, y, r float32) {
 	return x, y, r
 }
 
-func updateBaloons(balloons []*balloon, elapsedTime float32,
+func updateBalloons(balloons []*balloon, elapsedTime float32,
 	currentMouseState mouseState,
 	prevMouseState mouseState,
 	audioState *audioState) []*balloon {
@@ -298,7 +302,7 @@ func imgFileToTexture(renderer *sdl.Renderer, filename string) *sdl.Texture {
 	return tex
 }
 
-func loadBaloons(renderer *sdl.Renderer, numBalloons int) []*balloon {
+func loadBalloons(renderer *sdl.Renderer, numBalloons int) []*balloon {
 
 	explosionTexture := imgFileToTexture(renderer, "explosion.png")
 
@@ -361,7 +365,7 @@ func main() {
 	cloudGradient := getGradient(rgba{0, 0, 255}, rgba{255, 255, 255})
 	cloudPixels := rescaleAndDraw(noise, min, max, cloudGradient, winWidth, winHeight)
 	cloudTexture := pixelsToTexture(renderer, cloudPixels, winWidth, winHeight)
-	balloons := loadBaloons(renderer, 25)
+	balloons := loadBalloons(renderer, 25)
 	var elapsedTime float32
 	currentMouseState := getMouseState()
 	prevMouseState := currentMouseState
@@ -390,7 +394,7 @@ func main() {
 
 		renderer.Copy(cloudTexture, nil, nil)
 
-		balloons = updateBaloons(balloons, elapsedTime, currentMouseState, prevMouseState, &audioState)
+		balloons = updateBalloons(balloons, elapsedTime, currentMouseState, prevMouseState, &audioState)
 
 		sort.Stable(balloonArray(balloons))
 		for _, balloon := range balloons {
