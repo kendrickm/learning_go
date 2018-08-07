@@ -50,7 +50,7 @@ func pixelsToTexture(renderer *sdl.Renderer, pixels []byte, w, h int) *sdl.Textu
 	return tex
 }
 
-func APTToTexture(node1, node2 Node, w, h int, renderer *sdl.Renderer) *sdl.Texture {
+func aptToTexture(redNode, greenNode, blueNode Node, w, h int, renderer *sdl.Renderer) *sdl.Texture {
 	// -1.0 to 1.0
 	scale := float32(255 / 2)
 	offset := float32(1.0 * scale)
@@ -61,14 +61,15 @@ func APTToTexture(node1, node2 Node, w, h int, renderer *sdl.Renderer) *sdl.Text
 		for xi := 0; xi < w; xi++ {
 			x := float32(xi)/float32(w)*2 - 1
 
-			c1 := node1.Eval(x, y)
-			c2 := node2.Eval(x, y)
+			r := redNode.Eval(x, y)
+			g := greenNode.Eval(x, y)
+			b := blueNode.Eval(x, y)
 
-			pixels[pixelIndex] = byte(c1*scale - offset)
+			pixels[pixelIndex] = byte(r*scale - offset)
 			pixelIndex++
-			pixels[pixelIndex] = byte(c2*scale - offset)
+			pixels[pixelIndex] = byte(g*scale - offset)
 			pixelIndex++
-			pixels[pixelIndex] = 0 // byte(c*scale - offset)
+			pixels[pixelIndex] = byte(b*scale - offset)
 			pixelIndex++
 			pixelIndex++ //Skipping Alpha
 		}
@@ -121,12 +122,18 @@ func main() {
 	y := &OpY{}
 	sine := &OpSin{}
 	plus := &OpPlus{}
+	noise := &OpNoise{}
+	atan2 := &OpMult{}
 
-	sine.Child = x
-	plus.LeftChild = sine
-	plus.RightChild = y
+	atan2.LeftChild = x
+	atan2.RightChild = noise
+	noise.LeftChild = x
+	noise.RightChild = y
+	sine.Child = atan2
+	plus.LeftChild = y
+	plus.RightChild = sine
 
-	tex := APTToTexture(plus, sine, 800, 600, renderer)
+	tex := aptToTexture(plus, plus, plus, 800, 600, renderer)
 
 	// Changd after EP 06 to address MacOSX
 	// OSX requires that you consume events for windows to open and work properly
