@@ -2,9 +2,10 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"time"
 
-	. "github.com/kendrickm/evolvingpictures/apt"
+	. "github.com/kendrickm/learning_go/evolvingpictures/apt"
 	// . "github.com/kendrickm/vec3"
 	"github.com/veandco/go-sdl2/sdl"
 )
@@ -118,22 +119,70 @@ func main() {
 	currentMouseState := getMouseState()
 	// prevMouseState := currentMouseState
 
-	x := &OpX{}
-	y := &OpY{}
-	sine := &OpSin{}
-	plus := &OpPlus{}
-	noise := &OpNoise{}
-	atan2 := &OpMult{}
+	// x := &OpX{}
+	// y := &OpY{}
+	// sine := &OpSin{}
+	// plus := &OpPlus{}
+	// noise := &OpNoise{}
+	// atan2 := &OpMult{}
+	//
+	// atan2.LeftChild = x
+	// atan2.RightChild = noise
+	// noise.LeftChild = x
+	// noise.RightChild = y
+	// sine.Child = atan2
+	// plus.LeftChild = y
+	// plus.RightChild = sine
 
-	atan2.LeftChild = x
-	atan2.RightChild = noise
-	noise.LeftChild = x
-	noise.RightChild = y
-	sine.Child = atan2
-	plus.LeftChild = y
-	plus.RightChild = sine
+	aptR := GetRandomNode()
+	aptG := GetRandomNode()
+	aptB := GetRandomNode()
+	rand.Seed(time.Now().UTC().UnixNano())
 
-	tex := aptToTexture(plus, plus, plus, 800, 600, renderer)
+	num := rand.Intn(20)
+	for i := 0; i < num; i++ {
+		aptR.AddRandom(GetRandomNode())
+	}
+
+	num = rand.Intn(20)
+	for i := 0; i < num; i++ {
+		aptG.AddRandom(GetRandomNode())
+	}
+
+	num = rand.Intn(20)
+	for i := 0; i < num; i++ {
+		aptB.AddRandom(GetRandomNode())
+	}
+
+	for {
+		_, nilCount := aptR.NodeCounts()
+		if nilCount == 0 {
+			break
+		}
+		aptR.AddRandom(GetRandomLeaf())
+	}
+
+	for {
+		_, nilCount := aptG.NodeCounts()
+		if nilCount == 0 {
+			break
+		}
+		aptG.AddRandom(GetRandomLeaf())
+	}
+
+	for {
+		_, nilCount := aptB.NodeCounts()
+		if nilCount == 0 {
+			break
+		}
+		aptB.AddRandom(GetRandomLeaf())
+	}
+
+	fmt.Println("R: ", aptR)
+	fmt.Println("G: ", aptG)
+	fmt.Println("B: ", aptB)
+
+	tex := aptToTexture(aptR, aptG, aptB, 800, 600, renderer)
 
 	// Changd after EP 06 to address MacOSX
 	// OSX requires that you consume events for windows to open and work properly
