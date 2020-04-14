@@ -42,6 +42,79 @@ type rgba struct {
 	r, g, b byte
 }
 
+type picture struct {
+	r, g, b Node
+}
+
+func (p *picture) String() string {
+	return "R" + p.r.String() + "\n" + "G" + p.g.String() + "\n" + "B" + p.b.String()
+}
+
+func NewPicture() *picture {
+	p := &picture{}
+
+	p.r = GetRandomNode()
+	p.g = GetRandomNode()
+	p.b = GetRandomNode()
+	rand.Seed(time.Now().UTC().UnixNano())
+
+	num := rand.Intn(4)
+	for i := 0; i < num; i++ {
+		p.r.AddRandom(GetRandomNode())
+	}
+
+	num = rand.Intn(4)
+	for i := 0; i < num; i++ {
+		p.g.AddRandom(GetRandomNode())
+	}
+
+	num = rand.Intn(4)
+	for i := 0; i < num; i++ {
+		p.b.AddRandom(GetRandomNode())
+	}
+
+	for p.r.AddLeaf(GetRandomLeafNode()) {
+
+	}
+
+	for p.g.AddLeaf(GetRandomLeafNode()) {
+
+	}
+
+	for p.b.AddLeaf(GetRandomLeafNode()) {
+
+	}
+
+	return p
+}
+
+func (p *picture) Mutate() {
+	r := rand.Intn(3)
+	var nodeToMutate Node
+	switch r {
+	case 0:
+		nodeToMutate = p.r
+	case 1:
+		nodeToMutate = p.g
+	case 2:
+		nodeToMutate = p.b
+	}
+
+	count := nodeToMutate.NodeCount()
+	r = rand.Intn(count)
+
+	nodeToMutate, count = GetNthNode(nodeToMutate, r, 0)
+	mutation := Mutate(nodeToMutate)
+
+	if mutation == p.r {
+		p.r = mutation
+	} else if mutation == p.g {
+		p.g = mutation
+	} else if mutation == p.b {
+		p.b = mutation
+	}
+}
+
 func pixelsToTexture(renderer *sdl.Renderer, pixels []byte, w, h int) *sdl.Texture {
 	tex, err := renderer.CreateTexture(sdl.PIXELFORMAT_ABGR8888, sdl.TEXTUREACCESS_STREAMING, int32(w), int32(h))
 	if err != nil {
@@ -51,7 +124,7 @@ func pixelsToTexture(renderer *sdl.Renderer, pixels []byte, w, h int) *sdl.Textu
 	return tex
 }
 
-func aptToTexture(redNode, greenNode, blueNode Node, w, h int, renderer *sdl.Renderer) *sdl.Texture {
+func aptToTexture(pic *picture, w, h int, renderer *sdl.Renderer) *sdl.Texture {
 	// -1.0 to 1.0
 	scale := float32(255 / 2)
 	offset := float32(1.0 * scale)
@@ -62,9 +135,9 @@ func aptToTexture(redNode, greenNode, blueNode Node, w, h int, renderer *sdl.Ren
 		for xi := 0; xi < w; xi++ {
 			x := float32(xi)/float32(w)*2 - 1
 
-			r := redNode.Eval(x, y)
-			g := greenNode.Eval(x, y)
-			b := blueNode.Eval(x, y)
+			r := pic.r.Eval(x, y)
+			g := pic.g.Eval(x, y)
+			b := pic.g.Eval(x, y)
 
 			pixels[pixelIndex] = byte(r*scale - offset)
 			pixelIndex++
@@ -105,84 +178,14 @@ func main() {
 	defer renderer.Destroy()
 	sdl.SetHint(sdl.HINT_RENDER_SCALE_QUALITY, "1")
 
-	// explosionBytes, audioSpec := sdl.LoadWAV("explode.wav")
-	// audioID, err := sdl.OpenAudioDevice("", false, audioSpec, nil, 0)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// 	return
-	// }
-	// defer sdl.FreeWAV(explosionBytes)
-	//
-	// audioState := audioState{explosionBytes, audioID, audioSpec}
-
 	var elapsedTime float32
 	currentMouseState := getMouseState()
-	// prevMouseState := currentMouseState
+	prevMouseState := currentMouseState
 
-	// x := &OpX{}
-	// y := &OpY{}
-	// sine := &OpSin{}
-	// plus := &OpPlus{}
-	// noise := &OpNoise{}
-	// atan2 := &OpMult{}
-	//
-	// atan2.LeftChild = x
-	// atan2.RightChild = noise
-	// noise.LeftChild = x
-	// noise.RightChild = y
-	// sine.Child = atan2
-	// plus.LeftChild = y
-	// plus.RightChild = sine
-
-	aptR := GetRandomNode()
-	aptG := GetRandomNode()
-	aptB := GetRandomNode()
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	num := rand.Intn(20)
-	for i := 0; i < num; i++ {
-		aptR.AddRandom(GetRandomNode())
-	}
-
-	num = rand.Intn(20)
-	for i := 0; i < num; i++ {
-		aptG.AddRandom(GetRandomNode())
-	}
-
-	num = rand.Intn(20)
-	for i := 0; i < num; i++ {
-		aptB.AddRandom(GetRandomNode())
-	}
-
-	for {
-		_, nilCount := aptR.NodeCounts()
-		if nilCount == 0 {
-			break
-		}
-		aptR.AddRandom(GetRandomLeaf())
-	}
-
-	for {
-		_, nilCount := aptG.NodeCounts()
-		if nilCount == 0 {
-			break
-		}
-		aptG.AddRandom(GetRandomLeaf())
-	}
-
-	for {
-		_, nilCount := aptB.NodeCounts()
-		if nilCount == 0 {
-			break
-		}
-		aptB.AddRandom(GetRandomLeaf())
-	}
-
-	fmt.Println("R: ", aptR)
-	fmt.Println("G: ", aptG)
-	fmt.Println("B: ", aptB)
-
-	tex := aptToTexture(aptR, aptG, aptB, 800, 600, renderer)
+	pic := NewPicture()
+	tex := aptToTexture(pic, 800, 600, renderer)
 
 	// Changd after EP 06 to address MacOSX
 	// OSX requires that you consume events for windows to open and work properly
@@ -206,16 +209,20 @@ func main() {
 			}
 		}
 
+		if prevMouseState.leftButton && !currentMouseState.leftButton {
+			pic.Mutate()
+			tex = aptToTexture(pic, 800, 600, renderer)
+		}
+
 		renderer.Copy(tex, nil, nil)
 
 		renderer.Present()
 		elapsedTime = float32(time.Since(frameStart).Seconds() * 1000)
-		// fmt.Println("ms per frame: ", elapsedTime)
 		if elapsedTime < 5 {
 			sdl.Delay(5 - uint32(elapsedTime))
 			elapsedTime = float32(time.Since(frameStart).Seconds() * 1000)
 		}
 
-		// prevMouseState = currentMouseState
+		prevMouseState = currentMouseState
 	}
 }
