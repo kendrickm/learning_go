@@ -71,7 +71,9 @@ func (node *BaseNode) AddLeaf(leaf Node) bool {
 func (node *BaseNode) NodeCount() int {
 	count := 1
 	for _, child := range node.Children {
-		fmt.Println(count, child.NodeCount())
+		if child == nil {
+			panic("Found a nil child")
+		}
 		count += child.NodeCount()
 	}
 	return count
@@ -96,8 +98,10 @@ func Mutate(node Node) Node {
 	rand := rand.Intn(17)
 	var mutatedNode Node
 	if rand <= 13 {
+		fmt.Println("DEBUG: Adding rand node")
 		mutatedNode = GetRandomNode()
 	} else {
+		fmt.Println("DEBUG: Adding leaf node")
 		mutatedNode = GetRandomLeafNode()
 	}
 
@@ -417,7 +421,7 @@ type OpConstant struct {
 }
 
 func NewOpConstant() *OpConstant {
-	return &OpConstant{BaseNode{nil, make([]Node, 1)}, rand.Float32()*2 - 1}
+	return &OpConstant{BaseNode{nil, make([]Node, 0)}, rand.Float32()*2 - 1}
 }
 
 func (op *OpConstant) Eval(x, y float32) float32 {
@@ -425,7 +429,7 @@ func (op *OpConstant) Eval(x, y float32) float32 {
 }
 
 func (op *OpConstant) String() string {
-	return strconv.FormatFloat(float64(op.value), 'f', 9, 32)
+	return "Constant: " + strconv.FormatFloat(float64(op.value), 'f', 9, 32)
 }
 
 func GetRandomNode() Node {
