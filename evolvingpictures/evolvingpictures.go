@@ -99,6 +99,7 @@ func (p *picture) Mutate() {
 	case 2:
 		nodeToMutate = p.b
 	}
+	fmt.Println(nodeToMutate)
 
 	count := nodeToMutate.NodeCount()
 	r = rand.Intn(count)
