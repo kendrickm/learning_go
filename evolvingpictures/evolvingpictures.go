@@ -6,36 +6,24 @@ import (
 	"time"
 
 	. "github.com/kendrickm/learning_go/evolvingpictures/apt"
+	. "github.com/kendrickm/learning_go/evolvingpictures/gui"
+
 	// . "github.com/kendrickm/vec3"
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-const winWidth, winHeight, winDepth int = 800, 600, 100
+var winWidth, winHeight int = 800, 600
+var rows, cols, numPics int = 2, 2, rows * cols
+
+type pixelResult struct {
+	pixels []byte
+	index  int
+}
 
 type audioState struct {
 	explosionBytes []byte
 	deviceID       sdl.AudioDeviceID
 	audioSpec      *sdl.AudioSpec
-}
-
-type mouseState struct {
-	leftButton  bool
-	rightButton bool
-	x, y        int
-}
-
-func getMouseState() mouseState {
-	mouseX, mouseY, mouseButtonState := sdl.GetMouseState()
-	leftButton := mouseButtonState & sdl.ButtonLMask()
-	rightButton := mouseButtonState & sdl.ButtonRMask()
-
-	var result mouseState
-	result.x = int(mouseX)
-	result.y = int(mouseY)
-	result.leftButton = !(leftButton == 0)
-	result.rightButton = !(rightButton == 0)
-
-	return result
 }
 
 type rgba struct {
@@ -52,23 +40,22 @@ func (p *picture) String() string {
 
 func NewPicture() *picture {
 	p := &picture{}
-
+	rand.Seed(time.Now().UTC().UnixNano())
 	p.r = GetRandomNode()
 	p.g = GetRandomNode()
 	p.b = GetRandomNode()
-	rand.Seed(time.Now().UTC().UnixNano())
 
-	num := rand.Intn(4)
+	num := rand.Intn(20) + 5
 	for i := 0; i < num; i++ {
 		p.r.AddRandom(GetRandomNode())
 	}
 
-	num = rand.Intn(4)
+	num = rand.Intn(20) + 5
 	for i := 0; i < num; i++ {
 		p.g.AddRandom(GetRandomNode())
 	}
 
-	num = rand.Intn(4)
+	num = rand.Intn(20) + 5
 	for i := 0; i < num; i++ {
 		p.b.AddRandom(GetRandomNode())
 	}
@@ -125,7 +112,7 @@ func pixelsToTexture(renderer *sdl.Renderer, pixels []byte, w, h int) *sdl.Textu
 	return tex
 }
 
-func aptToTexture(pic *picture, w, h int, renderer *sdl.Renderer) *sdl.Texture {
+func aptToPixels(pic *picture, w, h int) []byte {
 	// -1.0 to 1.0
 	scale := float32(255 / 2)
 	offset := float32(1.0 * scale)
@@ -149,7 +136,7 @@ func aptToTexture(pic *picture, w, h int, renderer *sdl.Renderer) *sdl.Texture {
 			pixelIndex++ //Skipping Alpha
 		}
 	}
-	return pixelsToTexture(renderer, pixels, w, h)
+	return pixels
 }
 
 func main() {
@@ -180,42 +167,85 @@ func main() {
 	sdl.SetHint(sdl.HINT_RENDER_SCALE_QUALITY, "1")
 
 	var elapsedTime float32
-	currentMouseState := getMouseState()
-	prevMouseState := currentMouseState
 
 	rand.Seed(time.Now().UTC().UnixNano())
 
-	pic := NewPicture()
-	tex := aptToTexture(pic, 800, 600, renderer)
+	picTrees := make([]*picture, numPics)
+	for i := range picTrees {
+		picTrees[i] = NewPicture()
+		// fmt.Println(picTrees[i])
+	}
+
+	picWidth := int(float32(winWidth/cols) * float32(.9))
+	picHeight := int(float32(winHeight/rows) * float32(.9))
+
+	pixelsChannel := make(chan pixelResult, numPics)
+
+	buttons := make([]*ImageButton, numPics)
+	for i := range picTrees {
+		go func(i int) {
+			pixels := aptToPixels(picTrees[i], picWidth, picHeight)
+			pixelsChannel <- pixelResult{pixels, i}
+		}(i)
+	}
 
 	// Changd after EP 06 to address MacOSX
 	// OSX requires that you consume events for windows to open and work properly
+	keyboardState := sdl.GetKeyboardState()
+	mouseState := GetMouseState()
 	for {
 		frameStart := time.Now()
 
-		currentMouseState = getMouseState()
-
+		mouseState.Update()
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 			switch e := event.(type) {
 			case *sdl.QuitEvent:
 				return
 			case *sdl.TouchFingerEvent:
 				if e.Type == sdl.FINGERDOWN {
+					fmt.Println("Click")
 					touchX := int(e.X * float32(winWidth))
 					touchY := int(e.Y * float32(winHeight))
-					currentMouseState.x = touchX
-					currentMouseState.y = touchY
-					currentMouseState.leftButton = true
+					mouseState.X = touchX
+					mouseState.Y = touchY
+					mouseState.LeftButton = true
 				}
 			}
 		}
 
-		if prevMouseState.leftButton && !currentMouseState.leftButton {
-			pic.Mutate()
-			tex = aptToTexture(pic, 800, 600, renderer)
+		if keyboardState[sdl.SCANCODE_ESCAPE] != 0 {
+			return
 		}
 
-		renderer.Copy(tex, nil, nil)
+		select {
+		case pixelsAndIndex, ok := <-pixelsChannel:
+			if ok {
+				tex := pixelsToTexture(renderer, pixelsAndIndex.pixels, picWidth, picHeight)
+				xi := pixelsAndIndex.index % cols
+				yi := (pixelsAndIndex.index - xi) / cols
+				x := int32(xi * picWidth)
+				y := int32(yi * picHeight)
+				xPad := int32(float32(winWidth) * .1 / float32(cols+1))
+				yPad := int32(float32(winHeight) * .1 / float32(rows+1))
+				x += xPad * (int32(xi) + 1)
+				y += yPad * (int32(yi) + 1)
+				rect := &sdl.Rect{x, y, int32(picWidth), int32(picHeight)}
+				button := NewImageButton(renderer, tex, *rect, sdl.Color{255, 255, 255, 0})
+				buttons[pixelsAndIndex.index] = button
+			}
+		default:
+		}
+
+		renderer.Clear()
+		for _, button := range buttons {
+			if button != nil {
+				button.Update(*mouseState)
+				if button.WasLeftClicked {
+					button.IsSelcted = !button.IsSelcted
+				}
+				button.Draw(renderer)
+			}
+		}
 
 		renderer.Present()
 		elapsedTime = float32(time.Since(frameStart).Seconds() * 1000)
@@ -223,7 +253,5 @@ func main() {
 			sdl.Delay(5 - uint32(elapsedTime))
 			elapsedTime = float32(time.Since(frameStart).Seconds() * 1000)
 		}
-
-		prevMouseState = currentMouseState
 	}
 }

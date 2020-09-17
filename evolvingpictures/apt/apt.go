@@ -421,7 +421,9 @@ type OpConstant struct {
 }
 
 func NewOpConstant() *OpConstant {
-	return &OpConstant{BaseNode{nil, make([]Node, 0)}, rand.Float32()*2 - 1}
+	x := &OpConstant{BaseNode{nil, make([]Node, 0)}, rand.Float32()*2 - 1}
+	fmt.Println(x)
+	return x
 }
 
 func (op *OpConstant) Eval(x, y float32) float32 {
