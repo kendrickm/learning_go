@@ -1,3 +1,13 @@
+// Homework Ideas
+//
+// 1. Make large image load in goroutine, display loading indication while it's loading
+// 2. Instead of passing x,y for each pixel, pass a single array for all pixels and evaluate the whole  array at once
+// 		measure and compare performance
+// 3. Make the string() functions output valid Go code, and make a program that will run that code and render it
+//		Make template source that renders the output
+// 4. Currently we have R G and B for each picture. Do a greyscale picture with just one node, or HSV picture
+// 		which uses Hue, Satuation, Value and then convert HSV to RGB
+
 package main
 
 import (
@@ -12,12 +22,17 @@ import (
 	"github.com/veandco/go-sdl2/sdl"
 )
 
-var winWidth, winHeight int = 800, 600
-var rows, cols, numPics int = 2, 2, rows * cols
+var winWidth, winHeight int = 1700, 900
+var rows, cols, numPics int = 5, 5, rows * cols
 
 type pixelResult struct {
 	pixels []byte
 	index  int
+}
+
+type guiState struct {
+	zoom    bool
+	zoomImg *sdl.Texture
 }
 
 type audioState struct {
@@ -40,22 +55,21 @@ func (p *picture) String() string {
 
 func NewPicture() *picture {
 	p := &picture{}
-	rand.Seed(time.Now().UTC().UnixNano())
 	p.r = GetRandomNode()
 	p.g = GetRandomNode()
 	p.b = GetRandomNode()
 
-	num := rand.Intn(20) + 5
+	num := rand.Intn(25) + 5
 	for i := 0; i < num; i++ {
 		p.r.AddRandom(GetRandomNode())
 	}
 
-	num = rand.Intn(20) + 5
+	num = rand.Intn(25) + 5
 	for i := 0; i < num; i++ {
 		p.g.AddRandom(GetRandomNode())
 	}
 
-	num = rand.Intn(20) + 5
+	num = rand.Intn(25) + 5
 	for i := 0; i < num; i++ {
 		p.b.AddRandom(GetRandomNode())
 	}
@@ -75,7 +89,63 @@ func NewPicture() *picture {
 	return p
 }
 
-func (p *picture) Mutate() {
+func (p *picture) pickRandomColor() Node {
+	r := rand.Intn(3)
+	switch r {
+	case 0:
+		return p.r
+	case 1:
+		return p.g
+	case 2:
+		return p.b
+	default:
+		panic("pickRandomColor failed")
+	}
+}
+
+func cross(a *picture, b *picture) *picture {
+	aCopy := &picture{CopyTree(a.r, nil), CopyTree(a.g, nil), CopyTree(a.b, nil)}
+	aColor := aCopy.pickRandomColor()
+	bColor := b.pickRandomColor()
+
+	aIndex := rand.Intn(aColor.NodeCount())
+	aNode, _ := GetNthNode(aColor, aIndex, 0)
+
+	bIndex := rand.Intn(bColor.NodeCount())
+	bNode, _ := GetNthNode(bColor, bIndex, 0)
+	bNodeCopy := CopyTree(bNode, bNode.GetParent())
+
+	ReplaceNode(aNode, bNodeCopy)
+	return aCopy
+}
+
+func evolve(survivors []*picture) []*picture {
+	newPics := make([]*picture, numPics)
+	i := 0
+	for i < len(survivors) {
+		a := survivors[i]
+		b := survivors[rand.Intn(len(survivors))]
+		newPics[i] = cross(a, b)
+		i++
+	}
+
+	for i < len(newPics) {
+		a := survivors[rand.Intn(len(survivors))]
+		b := survivors[rand.Intn(len(survivors))]
+		newPics[i] = cross(a, b)
+		i++
+	}
+
+	for _, pic := range newPics {
+		r := rand.Intn(4)
+		for i := 0; i < r; i++ {
+			pic.mutate()
+		}
+	}
+	return newPics
+}
+
+func (p *picture) mutate() {
 	r := rand.Intn(3)
 	var nodeToMutate Node
 	switch r {
@@ -86,7 +156,7 @@ func (p *picture) Mutate() {
 	case 2:
 		nodeToMutate = p.b
 	}
-	fmt.Println(nodeToMutate)
+	//fmt.Println(nodeToMutate)
 
 	count := nodeToMutate.NodeCount()
 	r = rand.Intn(count)
@@ -125,7 +195,7 @@ func aptToPixels(pic *picture, w, h int) []byte {
 
 			r := pic.r.Eval(x, y)
 			g := pic.g.Eval(x, y)
-			b := pic.g.Eval(x, y)
+			b := pic.b.Eval(x, y)
 
 			pixels[pixelIndex] = byte(r*scale - offset)
 			pixelIndex++
@@ -176,15 +246,19 @@ func main() {
 		// fmt.Println(picTrees[i])
 	}
 
-	picWidth := int(float32(winWidth/cols) * float32(.9))
-	picHeight := int(float32(winHeight/rows) * float32(.9))
+	picWidth := int(float32(winWidth/cols) * float32(.8))
+	picHeight := int(float32(winHeight/rows) * float32(.8))
 
 	pixelsChannel := make(chan pixelResult, numPics)
+
+	evolveButtonText := GetSinglePixelTex(renderer, sdl.Color{255, 255, 255, 0})
+	evolveRect := sdl.Rect{int32(float32(winWidth/2) - float32(picWidth)/2), int32(float32(winHeight) - (float32(winHeight) * .1)), int32(picWidth), int32(float32(winHeight) * .08)}
+	evolveButton := NewImageButton(renderer, evolveButtonText, evolveRect, sdl.Color{255, 255, 255, 0})
 
 	buttons := make([]*ImageButton, numPics)
 	for i := range picTrees {
 		go func(i int) {
-			pixels := aptToPixels(picTrees[i], picWidth, picHeight)
+			pixels := aptToPixels(picTrees[i], picWidth*2, picHeight*2)
 			pixelsChannel <- pixelResult{pixels, i}
 		}(i)
 	}
@@ -193,6 +267,7 @@ func main() {
 	// OSX requires that you consume events for windows to open and work properly
 	keyboardState := sdl.GetKeyboardState()
 	mouseState := GetMouseState()
+	guiState := guiState{false, nil}
 	for {
 		frameStart := time.Now()
 
@@ -203,7 +278,6 @@ func main() {
 				return
 			case *sdl.TouchFingerEvent:
 				if e.Type == sdl.FINGERDOWN {
-					fmt.Println("Click")
 					touchX := int(e.X * float32(winWidth))
 					touchY := int(e.Y * float32(winHeight))
 					mouseState.X = touchX
@@ -216,35 +290,72 @@ func main() {
 		if keyboardState[sdl.SCANCODE_ESCAPE] != 0 {
 			return
 		}
-
-		select {
-		case pixelsAndIndex, ok := <-pixelsChannel:
-			if ok {
-				tex := pixelsToTexture(renderer, pixelsAndIndex.pixels, picWidth, picHeight)
-				xi := pixelsAndIndex.index % cols
-				yi := (pixelsAndIndex.index - xi) / cols
-				x := int32(xi * picWidth)
-				y := int32(yi * picHeight)
-				xPad := int32(float32(winWidth) * .1 / float32(cols+1))
-				yPad := int32(float32(winHeight) * .1 / float32(rows+1))
-				x += xPad * (int32(xi) + 1)
-				y += yPad * (int32(yi) + 1)
-				rect := &sdl.Rect{x, y, int32(picWidth), int32(picHeight)}
-				button := NewImageButton(renderer, tex, *rect, sdl.Color{255, 255, 255, 0})
-				buttons[pixelsAndIndex.index] = button
-			}
-		default:
-		}
-
-		renderer.Clear()
-		for _, button := range buttons {
-			if button != nil {
-				button.Update(*mouseState)
-				if button.WasLeftClicked {
-					button.IsSelcted = !button.IsSelcted
+		if !guiState.zoom {
+			select {
+			case pixelsAndIndex, ok := <-pixelsChannel:
+				if ok {
+					tex := pixelsToTexture(renderer, pixelsAndIndex.pixels, picWidth*2, picHeight*2)
+					xi := pixelsAndIndex.index % cols
+					yi := (pixelsAndIndex.index - xi) / cols
+					x := int32(xi * picWidth)
+					y := int32(yi * picHeight)
+					xPad := int32(float32(winWidth) * .1 / float32(cols+1))
+					yPad := int32(float32(winHeight) * .1 / float32(rows+1))
+					x += xPad * (int32(xi) + 1)
+					y += yPad * (int32(yi) + 1)
+					rect := &sdl.Rect{x, y, int32(picWidth), int32(picHeight)}
+					button := NewImageButton(renderer, tex, *rect, sdl.Color{255, 255, 255, 0})
+					buttons[pixelsAndIndex.index] = button
 				}
-				button.Draw(renderer)
+			default:
 			}
+
+			renderer.Clear()
+			for i, button := range buttons {
+				if button != nil {
+					button.Update(*mouseState)
+					if button.WasLeftClicked {
+						button.IsSelcted = !button.IsSelcted
+					} else if button.WasRightClicked {
+						fmt.Println(picTrees[i])
+						zoomPixels := aptToPixels(picTrees[i], winWidth*2, winHeight*2)
+						zoomTex := pixelsToTexture(renderer, zoomPixels, winWidth*2, winHeight*2)
+						guiState.zoomImg = zoomTex
+						guiState.zoom = true
+					}
+					button.Draw(renderer)
+				}
+			}
+
+			evolveButton.Update(*mouseState)
+			if evolveButton.WasLeftClicked {
+				selectedPictures := make([]*picture, 0)
+				for i, button := range buttons {
+					if button.IsSelcted {
+						selectedPictures = append(selectedPictures, picTrees[i])
+					}
+				}
+				if len(selectedPictures) != 0 {
+					for i := range buttons {
+						buttons[i] = nil
+					}
+
+					picTrees = evolve(selectedPictures)
+					for i := range picTrees {
+						go func(i int) {
+							pixels := aptToPixels(picTrees[i], picWidth*2, picHeight*2)
+							pixelsChannel <- pixelResult{pixels, i}
+						}(i)
+					}
+				}
+			}
+			evolveButton.Draw(renderer)
+		} else {
+			if !mouseState.RightButton && mouseState.PrevRightButton {
+				guiState.zoom = false
+			}
+			renderer.Copy(guiState.zoomImg, nil, nil)
+
 		}
 
 		renderer.Present()
