@@ -7,8 +7,8 @@ import (
 type MouseState struct {
 	LeftButton      bool
 	RightButton     bool
-	PrevLeftbutton  bool
-	PrevRightbutton bool
+	PrevLeftButton  bool
+	PrevRightButton bool
 	PrevX, PrevY    int
 	X, Y            int
 }
@@ -30,14 +30,14 @@ func GetMouseState() *MouseState {
 func (mouseState *MouseState) Update() {
 	mouseState.PrevX = mouseState.X
 	mouseState.PrevY = mouseState.Y
-	mouseState.PrevLeftbutton = mouseState.LeftButton
-	mouseState.PrevRightbutton = mouseState.RightButton
+	mouseState.PrevLeftButton = mouseState.LeftButton
+	mouseState.PrevRightButton = mouseState.RightButton
 
 	X, Y, mouseButtonState := sdl.GetMouseState()
 	mouseState.X = int(X)
 	mouseState.Y = int(Y)
-	mouseState.LeftButton = !((mouseButtonState * sdl.ButtonLMask()) == 0)
-	mouseState.RightButton = !((mouseButtonState * sdl.ButtonRMask()) == 0)
+	mouseState.LeftButton = !((mouseButtonState & sdl.ButtonLMask()) == 0)
+	mouseState.RightButton = !((mouseButtonState & sdl.ButtonRMask()) == 0)
 }
 
 type ImageButton struct {
@@ -65,8 +65,8 @@ func NewImageButton(renderer *sdl.Renderer, image *sdl.Texture, rect sdl.Rect, s
 
 func (button *ImageButton) Update(mouseState MouseState) {
 	if button.Rect.HasIntersection(&sdl.Rect{int32(mouseState.X), int32(mouseState.Y), 1, 1}) {
-		button.WasLeftClicked = mouseState.PrevLeftbutton && !mouseState.LeftButton
-		button.WasRightClicked = mouseState.PrevRightbutton && !mouseState.RightButton
+		button.WasLeftClicked = mouseState.PrevLeftButton && !mouseState.LeftButton
+		button.WasRightClicked = mouseState.PrevRightButton && !mouseState.RightButton
 	} else {
 		button.WasLeftClicked = false
 		button.WasRightClicked = false
@@ -84,4 +84,18 @@ func (button *ImageButton) Draw(renderer *sdl.Renderer) {
 		renderer.Copy(button.SelectedVis, nil, &borderRect)
 	}
 	renderer.Copy(button.Image, nil, &button.Rect)
+}
+
+func GetSinglePixelTex(renderer *sdl.Renderer, color sdl.Color) *sdl.Texture {
+	tex, err := renderer.CreateTexture(sdl.PIXELFORMAT_ABGR8888, sdl.TEXTUREACCESS_STATIC, 1, 1)
+	if err != nil {
+		panic(err)
+	}
+	pixels := make([]byte, 4)
+	pixels[0] = color.R
+	pixels[1] = color.G
+	pixels[2] = color.B
+	pixels[3] = color.A
+	tex.Update(nil, pixels, 4)
+	return tex
 }

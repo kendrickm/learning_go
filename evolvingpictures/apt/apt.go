@@ -1,9 +1,10 @@
 package apt
 
+//Abstract Picture Tree
 import (
-	"fmt"
 	"math"
 	"math/rand"
+	"reflect"
 	"strconv"
 
 	"github.com/kendrickm/learning_go/noise"
@@ -14,6 +15,7 @@ type Node interface {
 	String() string
 	AddRandom(node Node)
 	SetParent(node Node)
+	SetChildren([]Node)
 	GetParent() Node
 	GetChildren() []Node
 	AddLeaf(leaf Node) bool
@@ -79,6 +81,34 @@ func (node *BaseNode) NodeCount() int {
 	return count
 }
 
+func CopyTree(node Node, parent Node) Node {
+	copy := reflect.New(reflect.ValueOf(node).Elem().Type()).Interface().(Node)
+	switch n := node.(type) {
+	case *OpConstant:
+		copy.(*OpConstant).value = n.value
+	}
+	copy.SetParent(parent)
+	copyChildren := make([]Node, len(node.GetChildren()))
+	copy.SetChildren(copyChildren)
+	for i := range copyChildren {
+		copyChildren[i] = CopyTree(node.GetChildren()[i], copy)
+	}
+
+	return copy
+}
+
+func ReplaceNode(old Node, new Node) {
+	oldParent := old.GetParent()
+	if oldParent != nil {
+		for i, child := range oldParent.GetChildren() {
+			if child == old {
+				oldParent.GetChildren()[i] = new
+			}
+		}
+	}
+	new.SetParent(oldParent)
+}
+
 func GetNthNode(node Node, n, count int) (Node, int) {
 	if n == count {
 		return node, count
@@ -94,14 +124,16 @@ func GetNthNode(node Node, n, count int) (Node, int) {
 	return nil, count
 }
 
+func (node *BaseNode) SetChildren(children []Node) {
+	node.Children = children
+}
+
 func Mutate(node Node) Node {
 	rand := rand.Intn(17)
 	var mutatedNode Node
 	if rand <= 13 {
-		fmt.Println("DEBUG: Adding rand node")
 		mutatedNode = GetRandomNode()
 	} else {
-		fmt.Println("DEBUG: Adding leaf node")
 		mutatedNode = GetRandomLeafNode()
 	}
 
@@ -422,7 +454,6 @@ type OpConstant struct {
 
 func NewOpConstant() *OpConstant {
 	x := &OpConstant{BaseNode{nil, make([]Node, 0)}, rand.Float32()*2 - 1}
-	fmt.Println(x)
 	return x
 }
 
@@ -434,8 +465,27 @@ func (op *OpConstant) String() string {
 	return "Constant: " + strconv.FormatFloat(float64(op.value), 'f', 9, 32)
 }
 
+type OpClip struct {
+	BaseNode
+}
+
+func NewOpClip() *OpClip {
+	return &OpClip{BaseNode{nil, make([]Node, 2)}}
+}
+
+func (op *OpClip) Eval(x, y float32) float32 {
+	value := op.Children[0].Eval(x, y)
+	max := float32(math.Abs(float64(op.Children[1].Eval(x, y))))
+	if value > max {
+		return max
+	} else if value < -max {
+		return -max
+	}
+	return value
+}
+
 func GetRandomNode() Node {
-	r := rand.Intn(13)
+	r := rand.Intn(14)
 	switch r {
 	case 0:
 		return NewOpPlus()
@@ -465,6 +515,8 @@ func GetRandomNode() Node {
 		return NewOpCeil()
 	case 13:
 		return NewOpFloor()
+	case 14:
+		return NewOpClip()
 	}
 	panic("Get Random Node failed")
 }
