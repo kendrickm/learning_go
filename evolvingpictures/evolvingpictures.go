@@ -266,6 +266,11 @@ func main() {
 	// Changd after EP 06 to address MacOSX
 	// OSX requires that you consume events for windows to open and work properly
 	keyboardState := sdl.GetKeyboardState()
+	preKeyboardState := make([]uint8, len(keyboardState))
+	for i, v := range keyboardState {
+		preKeyboardState[i] = v
+	}
+
 	mouseState := GetMouseState()
 	guiState := guiState{false, nil}
 	for {
@@ -354,11 +359,17 @@ func main() {
 			if !mouseState.RightButton && mouseState.PrevRightButton {
 				guiState.zoom = false
 			}
+			if keyboardState[sdl.SCANCODE_S] == 0 && preKeyboardState[sdl.SCANCODE_S] != 0 {
+				saveTree(state.zoomTree)
+			}
 			renderer.Copy(guiState.zoomImg, nil, nil)
 
 		}
 
 		renderer.Present()
+		for i, v := range keyboardState {
+			preKeyboardState[i] = v
+		}
 		elapsedTime = float32(time.Since(frameStart).Seconds() * 1000)
 		if elapsedTime < 5 {
 			sdl.Delay(5 - uint32(elapsedTime))
