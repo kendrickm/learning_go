@@ -100,7 +100,17 @@ type UI2d struct {
 
 func (*UI2d) Draw(level *game.Level) {
 	fmt.Println("We did something")
+
 	renderer.Copy(textureAtlas, nil, nil)
 	renderer.Present()
-	sdl.Delay(5000)
+   for {
+	for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
+	
+	  switch  event.(type) {
+          case *sdl.QuitEvent:
+             return
+          }
+        }
+    }
+	sdl.Delay(3000)
 }
