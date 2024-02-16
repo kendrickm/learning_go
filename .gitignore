@@ -1,3 +1,5 @@
 #This is a job interview project that shouldn't get pushed to github
 /proto
 .DS_Store
+SDL2.dll
+SDL2_image.dll
