@@ -10,8 +10,7 @@ import (
 type Game struct {
 	LevelChans []chan *Level
 	InputChan  chan *Input
-
-	Level *Level
+	Level      *Level
 }
 
 func NewGame(numWindows int, path string) *Game {
@@ -68,9 +67,10 @@ type Player struct {
 }
 
 type Level struct {
-	Map    [][]Tile
-	Player Player
-	Debug  map[Pos]bool
+	Map      [][]Tile
+	Player   Player
+	Monsters map[Pos]*Monster
+	Debug    map[Pos]bool
 }
 
 func loadLevelFromFile(filename string) *Level {
@@ -95,6 +95,7 @@ func loadLevelFromFile(filename string) *Level {
 
 	level := &Level{}
 	level.Map = make([][]Tile, len(levelLines))
+	level.Monsters = make(map[Pos]*Monster)
 	for i := range level.Map {
 		level.Map[i] = make([]Tile, longestRow)
 	}
@@ -116,9 +117,15 @@ func loadLevelFromFile(filename string) *Level {
 				t = OpenDoor
 			case '.':
 				t = DirtFloor
-			case 'P':
+			case '@':
 				level.Player.X = x
 				level.Player.Y = y
+				t = Pending //The tile under this is filled in later
+			case 'R':
+				level.Monsters[Pos{x, y}] = NewRat(Pos{x, y})
+				t = Pending
+			case 'S':
+				level.Monsters[Pos{x, y}] = NewSpider(Pos{x, y})
 				t = Pending
 			default:
 				panic("Invalid character in map")
@@ -128,35 +135,32 @@ func loadLevelFromFile(filename string) *Level {
 		}
 	}
 
+	//TODO: Use BFS for this
 	for y, row := range level.Map {
 		for x, tile := range row {
 			if tile == Pending {
-			SearchLoop:
-				for searchX := x - 1; searchX <= x+1; searchX++ {
-					for searchY := y - 1; searchY <= y+1; searchY++ {
-						searchTile := level.Map[searchY][searchX]
-						switch searchTile {
-						case DirtFloor:
-							level.Map[y][x] = DirtFloor
-							break SearchLoop
-						}
-
-					}
-				}
+				level.Map[y][x] = level.bfsFloor(Pos{x, y})
 			}
 		}
 	}
 	return level
 }
-func canWalk(level *Level, pos Pos) bool {
-	t := level.Map[pos.Y][pos.X]
+func inRange(level *Level, pos Pos) bool {
+	return (pos.X < len(level.Map[0]) && pos.Y < len(level.Map) && pos.X >= 0 && pos.Y >= 0)
+}
 
-	switch t {
-	case StoneWall, ClosedDoor, Blank:
-		return false
-	default:
-		return true
+func canWalk(level *Level, pos Pos) bool {
+	if inRange(level, pos) {
+		t := level.Map[pos.Y][pos.X]
+
+		switch t {
+		case StoneWall, ClosedDoor, Blank:
+			return false
+		default:
+			return true
+		}
 	}
+	return false
 }
 
 func checkDoor(level *Level, pos Pos) {
@@ -166,41 +170,50 @@ func checkDoor(level *Level, pos Pos) {
 	}
 }
 
+func (p *Player) Move(to Pos, level *Level) {
+	_, exists := level.Monsters[to]
+	if !exists {
+		p.Pos = to
+	}
+}
+
 func (game *Game) handleInput(input *Input) {
 	level := game.Level
 	p := level.Player
 	switch input.Typ {
 	case Search:
 		//game.bfs(, p.Pos)
-		game.astar(p.Pos, Pos{3, 2})
+		game.Level.astar(p.Pos, Pos{3, 2})
 	case Up:
-		if canWalk(level, Pos{p.X, p.Y - 1}) {
-			level.Player.Y--
+		newPos := Pos{p.X, p.Y - 1}
+		if canWalk(level, newPos) {
+			level.Player.Move(newPos, level)
 		} else {
-			checkDoor(level, Pos{p.X, p.Y - 1})
+			checkDoor(level, newPos)
 		}
 
 	case Down:
-		if canWalk(level, Pos{p.X, p.Y + 1}) {
-			level.Player.Y++
+		newPos := Pos{p.X, p.Y + 1}
+		if canWalk(level, newPos) {
+			level.Player.Move(newPos, level)
 		} else {
-			checkDoor(level, Pos{p.X, p.Y + 1})
+			checkDoor(level, newPos)
 		}
 	case Right:
-		if canWalk(level, Pos{p.X + 1, p.Y}) {
-			level.Player.X++
+		newPos := Pos{p.X + 1, p.Y}
+		if canWalk(level, newPos) {
+			level.Player.Move(newPos, level)
 		} else {
-			checkDoor(level, Pos{p.X + 1, p.Y})
+			checkDoor(level, newPos)
 		}
 	case Left:
-		if canWalk(level, Pos{p.X - 1, p.Y}) {
-			level.Player.X--
+		newPos := Pos{p.X - 1, p.Y}
+		if canWalk(level, newPos) {
+			level.Player.Move(newPos, level)
 		} else {
-			checkDoor(level, Pos{p.X - 1, p.Y})
+			checkDoor(level, newPos)
 		}
 	case CloseWindow:
-		fmt.Println("Trying to close window")
-		fmt.Println(len(game.LevelChans))
 		close(input.LevelChannel)
 		chanIndex := 0
 		for i, c := range game.LevelChans {
@@ -210,7 +223,6 @@ func (game *Game) handleInput(input *Input) {
 			}
 		}
 		game.LevelChans = append(game.LevelChans[:chanIndex], game.LevelChans[chanIndex+1:]...)
-		fmt.Println(len(game.LevelChans))
 	}
 }
 
@@ -237,29 +249,37 @@ func getNeighbors(level *Level, pos Pos) []Pos {
 	return neighbors
 }
 
-func (game *Game) bfs(start Pos) {
+func (level *Level) bfsFloor(start Pos) Tile {
 	frontier := make([]Pos, 0, 8)
 	frontier = append(frontier, start)
 	visited := make(map[Pos]bool)
 	visited[start] = true
-	game.Level.Debug = visited
+	level.Debug = visited
 
 	for len(frontier) > 0 {
 		current := frontier[0]
+		currentTile := level.Map[current.Y][current.X]
+		switch currentTile {
+		case DirtFloor:
+			return DirtFloor
+		default:
+
+		}
+
 		frontier = frontier[1:]
 
-		for _, next := range getNeighbors(game.Level, current) {
+		for _, next := range getNeighbors(level, current) {
 			if !visited[next] {
 				frontier = append(frontier, next)
 				visited[next] = true
-				// ui.Draw(level)
-				// time.Sleep(100 * time.Millisecond)
 			}
 		}
 	}
+
+	return DirtFloor
 }
 
-func (game *Game) astar(start Pos, goal Pos) []Pos {
+func (level *Level) astar(start Pos, goal Pos) []Pos {
 	frontier := make(pqueue, 0, 8)
 	frontier = frontier.push(start, 1)
 	cameFrom := make(map[Pos]Pos)
@@ -267,9 +287,8 @@ func (game *Game) astar(start Pos, goal Pos) []Pos {
 	costSoFar := make(map[Pos]int)
 	costSoFar[start] = 0
 
-	game.Level.Debug = make(map[Pos]bool)
 	var current Pos
-	// fmt.Println(len(frontier))
+
 	for len(frontier) > 0 {
 
 		frontier, current = frontier.pop()
@@ -282,22 +301,15 @@ func (game *Game) astar(start Pos, goal Pos) []Pos {
 				p = cameFrom[p]
 			}
 			path = append(path, p)
-			// level.Debug[p] = true
 
 			for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 { //Reversing the array
 				path[i], path[j] = path[j], path[i]
 			}
 
-			game.Level.Debug = make(map[Pos]bool) // Draws the search now reversed
-			for _, pos := range path {
-				game.Level.Debug[pos] = true
-				// ui.Draw(level)
-				// time.Sleep(100 * time.Millisecond)
-			}
 			return path
 		}
 
-		for _, next := range getNeighbors(game.Level, current) { //Does the search
+		for _, next := range getNeighbors(level, current) { //Does the search
 			newCost := costSoFar[current] + 1
 			_, exists := costSoFar[next]
 			if !exists || newCost < costSoFar[next] {
@@ -306,9 +318,6 @@ func (game *Game) astar(start Pos, goal Pos) []Pos {
 				yDist := int(math.Abs(float64(goal.Y - next.Y)))
 				priority := newCost + xDist + yDist
 				frontier = frontier.push(next, priority)
-				// level.Debug[next] = true
-				// ui.Draw(level)
-				// time.Sleep(100 * time.Millisecond)
 				cameFrom[next] = current
 
 			}
@@ -327,13 +336,15 @@ func (game *Game) Run() {
 	}
 
 	for input := range game.InputChan {
-		fmt.Println("Checking inputs")
 		fmt.Println(input.Typ)
 		if input.Typ == QuitGame {
 			fmt.Println("Quitting")
 			return
 		}
 		game.handleInput(input)
+		for _, monster := range game.Level.Monsters {
+			monster.Update(game.Level)
+		}
 
 		if len(game.LevelChans) == 0 {
 			return

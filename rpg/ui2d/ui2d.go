@@ -167,7 +167,6 @@ func (ui *ui) Run() {
 		}
 
 		if sdl.GetKeyboardFocus() == ui.window || sdl.GetMouseFocus() == ui.window {
-			// fmt.Println("Getting input")
 			var input game.Input
 			if ui.keyboardState[sdl.SCANCODE_UP] == 0 && ui.preKeyboardState[sdl.SCANCODE_UP] != 0 {
 				input.Typ = game.Up
@@ -194,8 +193,6 @@ func (ui *ui) Run() {
 			}
 
 			if input.Typ != game.None {
-				fmt.Println("Sending input")
-				fmt.Println(input)
 				ui.inputChan <- &input
 			}
 		}
@@ -244,7 +241,13 @@ func (ui *ui) Draw(level *game.Level) {
 		}
 	}
 
-	ui.renderer.Copy(ui.textureAtlas, &sdl.Rect{21 * 32, 59 * 32, 32, 32}, &sdl.Rect{X: int32(level.Player.X)*32 + offsetX, Y: int32(level.Player.Y)*32 + offsetY, W: 32, H: 32})
+	for pos, monster := range level.Monsters {
+		monsterSrcRect := ui.textureIndex[game.Tile(monster.Rune)][0]
+		ui.renderer.Copy(ui.textureAtlas, &monsterSrcRect, &sdl.Rect{X: int32(pos.X)*32 + offsetX, Y: int32(pos.Y)*32 + offsetY, W: 32, H: 32})
+
+	}
+	playerSrcRect := ui.textureIndex['@'][0]
+	ui.renderer.Copy(ui.textureAtlas, &playerSrcRect, &sdl.Rect{X: int32(level.Player.X)*32 + offsetX, Y: int32(level.Player.Y)*32 + offsetY, W: 32, H: 32})
 	ui.renderer.Present()
 
 }
