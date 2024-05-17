@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"strconv"
 )
 
 type Game struct {
@@ -60,17 +61,43 @@ type Pos struct {
 
 type Entity struct {
 	Pos
+	Name string
+	Rune rune
+}
+
+type Character struct {
+	Entity
+	Hitpoints    int
+	Strength     int
+	Speed        float64
+	ActionPoints float64
 }
 
 type Player struct {
-	Entity
+	Character
 }
 
 type Level struct {
 	Map      [][]Tile
-	Player   Player
+	Player   *Player
 	Monsters map[Pos]*Monster
 	Debug    map[Pos]bool
+}
+
+func Attack(c1, c2 *Character) {
+	fmt.Println("Attack!")
+	fmt.Println("Health of " + c1.Name + ": " + strconv.FormatInt(int64(c1.Hitpoints), 10))
+	fmt.Println("Health of " + c2.Name + ": " + strconv.FormatInt(int64(c2.Hitpoints), 10))
+	c1.ActionPoints -= 1
+	c2.Hitpoints -= c1.Strength
+	if c2.Hitpoints > 0 {
+		fmt.Println("Strike back!")
+		c2.ActionPoints -= 1
+		c1.Hitpoints -= c2.Strength
+	}
+	fmt.Println("FINISH!")
+	fmt.Println("Health of " + c1.Name + ": " + strconv.FormatInt(int64(c1.Hitpoints), 10))
+	fmt.Println("Health of " + c2.Name + ": " + strconv.FormatInt(int64(c2.Hitpoints), 10))
 }
 
 func loadLevelFromFile(filename string) *Level {
@@ -94,6 +121,12 @@ func loadLevelFromFile(filename string) *Level {
 	}
 
 	level := &Level{}
+	level.Player = &Player{}
+	level.Player.Strength = 20
+	level.Player.Hitpoints = 20
+	level.Player.Name = "Go"
+	level.Player.Rune = '@'
+	level.Player.ActionPoints = 0.0
 	level.Map = make([][]Tile, len(levelLines))
 	level.Monsters = make(map[Pos]*Monster)
 	for i := range level.Map {
@@ -171,9 +204,15 @@ func checkDoor(level *Level, pos Pos) {
 }
 
 func (p *Player) Move(to Pos, level *Level) {
-	_, exists := level.Monsters[to]
+	monster, exists := level.Monsters[to]
 	if !exists {
 		p.Pos = to
+	} else {
+		Attack(&level.Player.Character, &monster.Character)
+		if level.Player.Hitpoints <= 0 {
+			fmt.Println("You Died")
+			panic("You died")
+		}
 	}
 }
 
