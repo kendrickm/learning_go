@@ -11,4 +11,4 @@ require (
 	github.com/kendrickm/learning_go/rpg/ui2d v0.0.0-00010101000000-000000000000
 )
 
-require github.com/veandco/go-sdl2 v0.4.38 // indirect
+require github.com/veandco/go-sdl2 v0.4.40 // indirect
