@@ -82,6 +82,7 @@ type Level struct {
 	Player   *Player
 	Monsters map[Pos]*Monster
 	Debug    map[Pos]bool
+	Events   []string
 }
 
 func Attack(c1, c2 *Character) {
@@ -121,6 +122,7 @@ func loadLevelFromFile(filename string) *Level {
 	}
 
 	level := &Level{}
+	level.Events = make([]string, 0)
 	level.Player = &Player{}
 	level.Player.Strength = 20
 	level.Player.Hitpoints = 20
@@ -208,6 +210,7 @@ func (p *Player) Move(to Pos, level *Level) {
 	if !exists {
 		p.Pos = to
 	} else {
+		level.Events = append(level.Events, "Player attacking Monster")
 		Attack(&level.Player.Character, &monster.Character)
 		if level.Player.Hitpoints <= 0 {
 			fmt.Println("You Died")

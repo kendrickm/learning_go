@@ -34,13 +34,22 @@ type ui struct {
 	levelChan chan *game.Level
 	inputChan chan *game.Input
 
-	helloWorld *sdl.Texture
+	fontMedium *ttf.Font
+	fontLarge  *ttf.Font
+	fontSmall  *ttf.Font
+
+	string2TexSmall map[string]*sdl.Texture
+	string2TexMed   map[string]*sdl.Texture
+	string2TexLarge map[string]*sdl.Texture
 }
 
 func NewUI(inputChan chan *game.Input, levelChan chan *game.Level) *ui {
 	ui := &ui{}
 	ui.inputChan = inputChan
 	ui.levelChan = levelChan
+	ui.string2TexSmall = make(map[string]*sdl.Texture)
+	ui.string2TexMed = make(map[string]*sdl.Texture)
+	ui.string2TexLarge = make(map[string]*sdl.Texture)
 	ui.winHeight = 720
 	ui.winWidth = 1080
 	ui.r = rand.New(rand.NewSource(1))
@@ -69,12 +78,56 @@ func NewUI(inputChan chan *game.Input, levelChan chan *game.Level) *ui {
 	ui.centerX = -1
 	ui.centerY = -1
 
-	font, err := ttf.OpenFont("ui2d/assets/gothic.ttf", 32)
+	ui.fontSmall, err = ttf.OpenFont("ui2d/assets/gothic.ttf", 24)
 	if err != nil {
 		panic(err)
 	}
 
-	fontSurface, err := font.RenderUTF8Blended("Hello World", sdl.Color{255, 0, 0, 0})
+	ui.fontMedium, err = ttf.OpenFont("ui2d/assets/gothic.ttf", 32)
+	if err != nil {
+		panic(err)
+	}
+
+	ui.fontLarge, err = ttf.OpenFont("ui2d/assets/gothic.ttf", 64)
+	if err != nil {
+		panic(err)
+	}
+
+	return ui
+}
+
+type FontSize int
+
+const (
+	FontSmall FontSize = iota
+	FontMedium
+	FontLarge
+)
+
+func (ui *ui) stringToTexture(s string, size FontSize, color sdl.Color) *sdl.Texture {
+
+	var font *ttf.Font
+	switch size {
+	case FontSmall:
+		font = ui.fontSmall
+		tex, exists := ui.string2TexSmall[s]
+		if exists {
+			return tex
+		}
+	case FontMedium:
+		font = ui.fontMedium
+		tex, exists := ui.string2TexMed[s]
+		if exists {
+			return tex
+		}
+	case FontLarge:
+		font = ui.fontLarge
+		tex, exists := ui.string2TexLarge[s]
+		if exists {
+			return tex
+		}
+	}
+	fontSurface, err := font.RenderUTF8Blended(s, sdl.Color{255, 0, 0, 0})
 	if err != nil {
 		panic(err)
 	}
@@ -82,8 +135,17 @@ func NewUI(inputChan chan *game.Input, levelChan chan *game.Level) *ui {
 	if err != nil {
 		panic(err)
 	}
-	ui.helloWorld = fontTexture
-	return ui
+
+	switch size {
+	case FontSmall:
+		ui.string2TexSmall[s] = fontTexture
+	case FontMedium:
+		ui.string2TexMed[s] = fontTexture
+	case FontLarge:
+		ui.string2TexLarge[s] = fontTexture
+	}
+
+	return fontTexture
 }
 
 func (ui *ui) loadTextureIndex() {
@@ -269,7 +331,12 @@ func (ui *ui) Draw(level *game.Level) {
 	playerSrcRect := ui.textureIndex['@'][0]
 	ui.renderer.Copy(ui.textureAtlas, &playerSrcRect, &sdl.Rect{X: int32(level.Player.X)*32 + offsetX, Y: int32(level.Player.Y)*32 + offsetY, W: 32, H: 32})
 
-	ui.renderer.Copy(ui.helloWorld, nil, nil)
+	for i, event := range level.Events {
+		tex := ui.stringToTexture(event, FontLarge, sdl.Color{255, 0, 0, 0})
+		_, _, w, h, _ := tex.Query()
+		ui.renderer.Copy(tex, nil, &sdl.Rect{0, int32(i * 64), w, h})
+	}
+
 	ui.renderer.Present()
 
 }

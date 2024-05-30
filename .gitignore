@@ -3,3 +3,5 @@
 .DS_Store
 SDL2.dll
 SDL2_image.dll
+SDL2_ttf.dll
+rpg.exe
