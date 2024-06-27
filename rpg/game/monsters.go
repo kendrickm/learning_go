@@ -1,7 +1,5 @@
 package game
 
-import "fmt"
-
 type Monster struct {
 	Character
 }
@@ -11,8 +9,8 @@ func NewRat(p Pos) *Monster {
 	monster.Pos = p
 	monster.Name = "Rat"
 	monster.Rune = 'R'
-	monster.Hitpoints = 50
-	monster.Strength = 5
+	monster.Hitpoints = 10
+	monster.Strength = 1
 	monster.Speed = 2.0
 	monster.ActionPoints = 0.0
 	return monster
@@ -32,6 +30,7 @@ func NewSpider(p Pos) *Monster {
 
 func (m *Monster) Update(level *Level) {
 	if m.Hitpoints <= 0 {
+		level.AddEvent("You killed the " + m.Name)
 		delete(level.Monsters, m.Pos)
 		return
 	}
@@ -40,17 +39,25 @@ func (m *Monster) Update(level *Level) {
 
 	playerPos := level.Player.Pos
 	positions := level.astar(m.Pos, playerPos)
+
+	//Do we have a path to the goal?
+	if len(positions) == 0 {
+		m.Pass()
+		return
+	}
 	moveIndex := 1
 	for i := 0; i < apInt; i++ {
 		if moveIndex < len(positions) {
-			fmt.Println("Move")
 			m.Move(positions[moveIndex], level)
 			moveIndex++
 			m.ActionPoints--
 		}
 
 	}
+}
 
+func (m *Monster) Pass() {
+	m.ActionPoints -= m.Speed
 }
 
 func (m *Monster) Move(to Pos, level *Level) {
@@ -62,7 +69,10 @@ func (m *Monster) Move(to Pos, level *Level) {
 		delete(level.Monsters, m.Pos)
 		level.Monsters[to] = m
 		m.Pos = to
-	} else {
+		return
+	}
+	if to == level.Player.Pos {
+		level.AddEvent(m.Name + " atacked Player!")
 		Attack(&m.Character, &level.Player.Character)
 	}
 }

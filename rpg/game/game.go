@@ -83,6 +83,7 @@ type Level struct {
 	Monsters map[Pos]*Monster
 	Debug    map[Pos]bool
 	Events   []string
+	EventPos int
 }
 
 func Attack(c1, c2 *Character) {
@@ -91,14 +92,17 @@ func Attack(c1, c2 *Character) {
 	fmt.Println("Health of " + c2.Name + ": " + strconv.FormatInt(int64(c2.Hitpoints), 10))
 	c1.ActionPoints -= 1
 	c2.Hitpoints -= c1.Strength
-	if c2.Hitpoints > 0 {
-		fmt.Println("Strike back!")
-		c2.ActionPoints -= 1
-		c1.Hitpoints -= c2.Strength
-	}
-	fmt.Println("FINISH!")
 	fmt.Println("Health of " + c1.Name + ": " + strconv.FormatInt(int64(c1.Hitpoints), 10))
 	fmt.Println("Health of " + c2.Name + ": " + strconv.FormatInt(int64(c2.Hitpoints), 10))
+}
+
+func (level *Level) AddEvent(event string) {
+	level.Events[level.EventPos] = event
+	level.EventPos++
+	if level.EventPos == len(level.Events) {
+		level.EventPos = 0
+	}
+
 }
 
 func loadLevelFromFile(filename string) *Level {
@@ -122,9 +126,9 @@ func loadLevelFromFile(filename string) *Level {
 	}
 
 	level := &Level{}
-	level.Events = make([]string, 0)
+	level.Events = make([]string, 10)
 	level.Player = &Player{}
-	level.Player.Strength = 20
+	level.Player.Strength = 1
 	level.Player.Hitpoints = 20
 	level.Player.Name = "Go"
 	level.Player.Rune = '@'
@@ -210,7 +214,7 @@ func (p *Player) Move(to Pos, level *Level) {
 	if !exists {
 		p.Pos = to
 	} else {
-		level.Events = append(level.Events, "Player attacking Monster")
+		level.AddEvent("Player attacking Monster")
 		Attack(&level.Player.Character, &monster.Character)
 		if level.Player.Hitpoints <= 0 {
 			fmt.Println("You Died")

@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"unsafe"
 
 	"github.com/kendrickm/learning_go/rpg/game"
 	"github.com/veandco/go-sdl2/img"
@@ -15,7 +16,7 @@ import (
 	"github.com/veandco/go-sdl2/ttf"
 )
 
-//func f(p unsafe.Pointer) {}
+func f(p unsafe.Pointer) {}
 
 type ui struct {
 	winWidth  int
@@ -37,6 +38,8 @@ type ui struct {
 	fontMedium *ttf.Font
 	fontLarge  *ttf.Font
 	fontSmall  *ttf.Font
+
+	eventBackground *sdl.Texture
 
 	string2TexSmall map[string]*sdl.Texture
 	string2TexMed   map[string]*sdl.Texture
@@ -78,7 +81,7 @@ func NewUI(inputChan chan *game.Input, levelChan chan *game.Level) *ui {
 	ui.centerX = -1
 	ui.centerY = -1
 
-	ui.fontSmall, err = ttf.OpenFont("ui2d/assets/gothic.ttf", 24)
+	ui.fontSmall, err = ttf.OpenFont("ui2d/assets/gothic.ttf", 18)
 	if err != nil {
 		panic(err)
 	}
@@ -92,6 +95,8 @@ func NewUI(inputChan chan *game.Input, levelChan chan *game.Level) *ui {
 	if err != nil {
 		panic(err)
 	}
+
+	ui.eventBackground = ui.GetSinglePixelTex(sdl.Color{0, 0, 0, 128})
 
 	return ui
 }
@@ -224,6 +229,37 @@ func init() {
 	}
 }
 
+func (ui *ui) keyDownOnce(key uint8) bool {
+	return ui.keyboardState[key] == 1 && ui.preKeyboardState[key] == 0
+}
+
+// Check for key pressed and then released
+func (ui *ui) keyPressed(key uint8) bool {
+	return ui.keyboardState[key] == 0 && ui.preKeyboardState[key] == 1
+}
+
+func (ui *ui) GetSinglePixelTex(color sdl.Color) *sdl.Texture {
+	tex, err := ui.renderer.CreateTexture(sdl.PIXELFORMAT_ABGR8888, sdl.TEXTUREACCESS_STATIC, 1, 1)
+	if err != nil {
+		panic(err)
+	}
+	pixels := make([]byte, 4)
+	f(unsafe.Pointer(&pixels[0]))
+	pixels[0] = color.R
+	pixels[1] = color.G
+	pixels[2] = color.B
+	pixels[3] = color.A
+	//p := unsafe.Pointer(&pixels[0])
+
+	tex.Update(nil, unsafe.Pointer(&pixels[0]), 4)
+	err = tex.SetBlendMode(sdl.BLENDMODE_BLEND)
+	if err != nil {
+		panic(err)
+	}
+	// tex.Update(nil, (unsafe.Pointer(&pixels, 4)
+	return tex
+}
+
 func (ui *ui) Run() {
 
 	for {
@@ -250,24 +286,17 @@ func (ui *ui) Run() {
 		//TODO: Make a function to check for keypress
 		if sdl.GetKeyboardFocus() == ui.window || sdl.GetMouseFocus() == ui.window {
 			var input game.Input
-			if ui.keyboardState[sdl.SCANCODE_UP] == 1 && ui.preKeyboardState[sdl.SCANCODE_UP] == 0 {
+			if ui.keyDownOnce(sdl.SCANCODE_UP) {
 				input.Typ = game.Up
 			}
-
-			if ui.keyboardState[sdl.SCANCODE_DOWN] == 1 && ui.preKeyboardState[sdl.SCANCODE_DOWN] == 0 {
+			if ui.keyDownOnce(sdl.SCANCODE_DOWN) {
 				input.Typ = game.Down
 			}
-
-			if ui.keyboardState[sdl.SCANCODE_RIGHT] == 1 && ui.preKeyboardState[sdl.SCANCODE_RIGHT] == 0 {
+			if ui.keyDownOnce(sdl.SCANCODE_RIGHT) {
 				input.Typ = game.Right
 			}
-
-			if ui.keyboardState[sdl.SCANCODE_LEFT] == 1 && ui.preKeyboardState[sdl.SCANCODE_LEFT] == 0 {
+			if ui.keyDownOnce(sdl.SCANCODE_LEFT) {
 				input.Typ = game.Left
-			}
-
-			if ui.keyboardState[sdl.SCANCODE_S] == 1 && ui.preKeyboardState[sdl.SCANCODE_S] == 0 {
-				input.Typ = game.Search
 			}
 
 			for i, v := range ui.keyboardState {
@@ -319,7 +348,6 @@ func (ui *ui) Draw(level *game.Level) {
 				}
 				ui.renderer.Copy(ui.textureAtlas, &srcRect, &dstRect)
 			}
-			//fmt.Println(tile)
 		}
 	}
 
@@ -331,10 +359,24 @@ func (ui *ui) Draw(level *game.Level) {
 	playerSrcRect := ui.textureIndex['@'][0]
 	ui.renderer.Copy(ui.textureAtlas, &playerSrcRect, &sdl.Rect{X: int32(level.Player.X)*32 + offsetX, Y: int32(level.Player.Y)*32 + offsetY, W: 32, H: 32})
 
-	for i, event := range level.Events {
-		tex := ui.stringToTexture(event, FontLarge, sdl.Color{255, 0, 0, 0})
-		_, _, w, h, _ := tex.Query()
-		ui.renderer.Copy(tex, nil, &sdl.Rect{0, int32(i * 64), w, h})
+	// TODO Scroll from bottom up
+	// TODO add border/background
+	textStart := int32(float64(ui.winHeight) * 0.75)
+	textWidth := int32(float64(ui.winWidth) * 0.25)
+	ui.renderer.Copy(ui.eventBackground, nil, &sdl.Rect{0, textStart, textWidth, int32(ui.winHeight) - textStart})
+	i := level.EventPos
+	for {
+		fmt.Println("i: ", i, "EventPos: ", level.EventPos)
+		event := level.Events[i]
+		if event != "" {
+			tex := ui.stringToTexture(event, FontSmall, sdl.Color{255, 0, 0, 0})
+			_, _, w, h, _ := tex.Query()
+			ui.renderer.Copy(tex, nil, &sdl.Rect{0, int32(i*18) + textStart, w, h})
+		}
+		i = (i + 1) % (len(level.Events))
+		if i == level.EventPos {
+			break
+		}
 	}
 
 	ui.renderer.Present()
