@@ -63,8 +63,7 @@ func (m *Monster) Pass() {
 func (m *Monster) Move(to Pos, level *Level) {
 	_, exists := level.Monsters[to]
 
-	//TODO Check it tile being moved to is valid
-	//TODO if player is in the way attack
+
 	if !exists && to != level.Player.Pos {
 		delete(level.Monsters, m.Pos)
 		level.Monsters[to] = m
@@ -72,7 +71,12 @@ func (m *Monster) Move(to Pos, level *Level) {
 		return
 	}
 	if to == level.Player.Pos {
-		level.AddEvent(m.Name + " atacked Player!")
-		Attack(&m.Character, &level.Player.Character)
+		level.Attack(&m.Character, &level.Player.Character)
+		if m.Hitpoints <= 0 {
+			delete(level.Monsters, m.Pos)
+		}
+		if level.Player.Hitpoints <= 0 {
+			panic("you ded")
+		}
 	}
 }
