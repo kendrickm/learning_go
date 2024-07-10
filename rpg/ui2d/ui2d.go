@@ -244,7 +244,7 @@ func (ui *ui) GetSinglePixelTex(color sdl.Color) *sdl.Texture {
 		panic(err)
 	}
 	pixels := make([]byte, 4)
-	f(unsafe.Pointer(&pixels[0]))
+	//f(unsafe.Pointer(&pixels[0]))
 	pixels[0] = color.R
 	pixels[1] = color.G
 	pixels[2] = color.B
@@ -335,7 +335,7 @@ func (ui *ui) Draw(level *game.Level) {
 	ui.r.Seed(2)
 	for y, row := range level.Map {
 		for x, tile := range row {
-			if tile.Rune != game.Blank {
+			if tile.Rune != game.Blank && tile.Visible {
 				srcRects := ui.textureIndex[tile.Rune]
 				srcRect := srcRects[ui.r.Intn(len(srcRects))]
 				dstRect := sdl.Rect{int32(x*32) + offsetX, int32(y*32) + offsetY, 32, 32}
@@ -352,9 +352,10 @@ func (ui *ui) Draw(level *game.Level) {
 	}
 
 	for pos, monster := range level.Monsters {
-		monsterSrcRect := ui.textureIndex[monster.Rune][0]
-		ui.renderer.Copy(ui.textureAtlas, &monsterSrcRect, &sdl.Rect{X: int32(pos.X)*32 + offsetX, Y: int32(pos.Y)*32 + offsetY, W: 32, H: 32})
-
+		if level.Map[pos.Y][pos.X].Visible {
+			monsterSrcRect := ui.textureIndex[monster.Rune][0]
+			ui.renderer.Copy(ui.textureAtlas, &monsterSrcRect, &sdl.Rect{X: int32(pos.X)*32 + offsetX, Y: int32(pos.Y)*32 + offsetY, W: 32, H: 32})
+		}
 	}
 	playerSrcRect := ui.textureIndex['@'][0]
 	ui.renderer.Copy(ui.textureAtlas, &playerSrcRect, &sdl.Rect{X: int32(level.Player.X)*32 + offsetX, Y: int32(level.Player.Y)*32 + offsetY, W: 32, H: 32})
@@ -366,9 +367,9 @@ func (ui *ui) Draw(level *game.Level) {
 	ui.renderer.Copy(ui.eventBackground, nil, &sdl.Rect{0, textStart, textWidth, int32(ui.winHeight) - textStart})
 	i := level.EventPos
 	count := 0
-	_, fontSizeY,_ := ui.fontSmall.SizeUTF8("A")
+	_, fontSizeY, _ := ui.fontSmall.SizeUTF8("A")
 	for {
-		fmt.Println("i: ", i, "EventPos: ", level.EventPos)
+		//fmt.Println("i: ", i, "EventPos: ", level.EventPos)
 		event := level.Events[i]
 		if event != "" {
 			tex := ui.stringToTexture(event, FontSmall, sdl.Color{255, 0, 0, 0})
@@ -376,7 +377,7 @@ func (ui *ui) Draw(level *game.Level) {
 			ui.renderer.Copy(tex, nil, &sdl.Rect{5, int32(count*fontSizeY) + textStart, w, h})
 		}
 		i = (i + 1) % (len(level.Events))
-		count ++
+		count++
 		if i == level.EventPos {
 			break
 		}

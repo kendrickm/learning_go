@@ -13,6 +13,7 @@ func NewRat(p Pos) *Monster {
 	monster.Strength = 1
 	monster.Speed = 2.0
 	monster.ActionPoints = 0.0
+	monster.SightRange = 10
 	return monster
 }
 
@@ -25,6 +26,7 @@ func NewSpider(p Pos) *Monster {
 	monster.Strength = 1
 	monster.Speed = 1.0
 	monster.ActionPoints = 0.0
+	monster.SightRange = 10
 	return monster
 }
 
@@ -62,7 +64,6 @@ func (m *Monster) Pass() {
 
 func (m *Monster) Move(to Pos, level *Level) {
 	_, exists := level.Monsters[to]
-
 
 	if !exists && to != level.Player.Pos {
 		delete(level.Monsters, m.Pos)
