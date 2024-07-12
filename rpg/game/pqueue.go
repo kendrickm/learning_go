@@ -10,7 +10,6 @@ type pqueue []priorityPos
 func (pq pqueue) push(pos Pos, priority int) pqueue {
 	newNode := priorityPos{pos, priority}
 	pq = append(pq, newNode)
-	//i-1/2
 	newNodeIndex := len(pq) - 1
 	parentIndex, parent := pq.parent(newNodeIndex)
 
@@ -19,7 +18,6 @@ func (pq pqueue) push(pos Pos, priority int) pqueue {
 		newNodeIndex = parentIndex
 		parentIndex, parent = pq.parent(newNodeIndex)
 	}
-
 	return pq
 }
 
@@ -40,6 +38,7 @@ func (pq pqueue) pop() (pqueue, Pos) {
 
 	for (leftExists && node.priority > left.priority) ||
 		(rightExists && node.priority > right.priority) {
+
 		if !rightExists || left.priority <= right.priority {
 			pq.swap(index, leftIndex)
 			index = leftIndex
@@ -53,6 +52,7 @@ func (pq pqueue) pop() (pqueue, Pos) {
 	}
 
 	return pq, result
+
 }
 
 func (pq pqueue) swap(i, j int) {
@@ -71,7 +71,6 @@ func (pq pqueue) left(i int) (bool, int, priorityPos) {
 	if index < len(pq) {
 		return true, index, pq[index]
 	}
-
 	return false, 0, priorityPos{}
 }
 
@@ -80,6 +79,5 @@ func (pq pqueue) right(i int) (bool, int, priorityPos) {
 	if index < len(pq) {
 		return true, index, pq[index]
 	}
-
 	return false, 0, priorityPos{}
 }
