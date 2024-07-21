@@ -244,19 +244,16 @@ func (ui *ui) GetSinglePixelTex(color sdl.Color) *sdl.Texture {
 		panic(err)
 	}
 	pixels := make([]byte, 4)
-	//f(unsafe.Pointer(&pixels[0]))
 	pixels[0] = color.R
 	pixels[1] = color.G
 	pixels[2] = color.B
 	pixels[3] = color.A
-	//p := unsafe.Pointer(&pixels[0])
 
 	tex.Update(nil, unsafe.Pointer(&pixels[0]), 4)
 	err = tex.SetBlendMode(sdl.BLENDMODE_BLEND)
 	if err != nil {
 		panic(err)
 	}
-	// tex.Update(nil, (unsafe.Pointer(&pixels, 4)
 	return tex
 }
 
@@ -283,7 +280,7 @@ func (ui *ui) Run() {
 			}
 		default:
 		}
-		//TODO: Make a function to check for keypress
+
 		if sdl.GetKeyboardFocus() == ui.window || sdl.GetMouseFocus() == ui.window {
 			var input game.Input
 			if ui.keyDownOnce(sdl.SCANCODE_UP) {
@@ -334,7 +331,7 @@ func (ui *ui) Draw(level *game.Level) {
 	ui.renderer.Clear()
 	ui.r.Seed(2)
 	for y, row := range level.Map {
-		for x, tile := range row {	
+		for x, tile := range row {
 			if tile.Rune != game.Blank {
 				srcRects := ui.textureIndex[tile.Rune]
 				srcRect := srcRects[ui.r.Intn(len(srcRects))]
@@ -343,10 +340,9 @@ func (ui *ui) Draw(level *game.Level) {
 					pos := game.Pos{x, y}
 					if level.Debug[pos] {
 						ui.textureAtlas.SetColorMod(128, 0, 0)
-					} else if tile.Seen && !tile.Visible  {
+					} else if tile.Seen && !tile.Visible {
 						ui.textureAtlas.SetColorMod(128, 128, 128)
-					} else
-						{
+					} else {
 						ui.textureAtlas.SetColorMod(255, 255, 255)
 					}
 					ui.renderer.Copy(ui.textureAtlas, &srcRect, &dstRect)
@@ -357,10 +353,10 @@ func (ui *ui) Draw(level *game.Level) {
 						ui.renderer.Copy(ui.textureAtlas, &srcRect, &dstRect)
 					}
 				}
-		    }
+			}
 		}
 	}
-	ui.textureAtlas.SetColorMod(255,255,255)
+	ui.textureAtlas.SetColorMod(255, 255, 255)
 	for pos, monster := range level.Monsters {
 		if level.Map[pos.Y][pos.X].Visible {
 			monsterSrcRect := ui.textureIndex[monster.Rune][0]
@@ -379,7 +375,6 @@ func (ui *ui) Draw(level *game.Level) {
 	count := 0
 	_, fontSizeY, _ := ui.fontSmall.SizeUTF8("A")
 	for {
-		//fmt.Println("i: ", i, "EventPos: ", level.EventPos)
 		event := level.Events[i]
 		if event != "" {
 			tex := ui.stringToTexture(event, FontSmall, sdl.Color{255, 0, 0, 0})

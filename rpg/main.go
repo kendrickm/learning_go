@@ -8,7 +8,7 @@ import (
 func main() {
 	// TODO When we need multiple UI Support refactor event polling to it's own component
 	// and run only on main thread
-	game := game.NewGame(1, "game/maps/level1.map")
+	game := game.NewGame(1)
 	go func() {
 		game.Run()
 
