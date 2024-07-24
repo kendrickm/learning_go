@@ -283,9 +283,12 @@ func loadLevels() map[string]*Level {
 
 	for _, filename := range filenames {
 
-		extIndex := strings.LastIndex(filename, ".map")
-		lastSlashIndex := strings.LastIndex(filename, "\\")
-		levelName := filename[lastSlashIndex+1 : extIndex]
+		//extIndex := strings.LastIndex(filename, ".map")
+		// lastSlashIndex := strings.LastIndex(filename, "\\")
+		// lastSlashIndex := strings.LastIndex(filename, "/")
+		//levelName := filepath.Base(filename)
+		// levelName := filename[lastSlashIndex+1 : extIndex]
+		levelName := strings.TrimSuffix(filepath.Base(filename), filepath.Ext(filename))
 		fmt.Println("loading:", levelName)
 		file, err := os.Open(filename)
 		if err != nil {

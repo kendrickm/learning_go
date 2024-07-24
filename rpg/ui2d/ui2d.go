@@ -14,6 +14,7 @@ import (
 	"github.com/veandco/go-sdl2/img"
 	"github.com/veandco/go-sdl2/sdl"
 	"github.com/veandco/go-sdl2/ttf"
+	"github.com/veandco/go-sdl2/mix"
 )
 
 func f(p unsafe.Pointer) {}
@@ -97,6 +98,18 @@ func NewUI(inputChan chan *game.Input, levelChan chan *game.Level) *ui {
 	}
 
 	ui.eventBackground = ui.GetSinglePixelTex(sdl.Color{0, 0, 0, 128})
+
+	err = mix.OpenAudio(22050, mix.DEFAULT_FORMAT,2,4096)
+	if err != nil {
+		panic(err)
+	}
+
+	mus,err :=  mix.LoadMUS("ui2d/assets/ambient.ogg")
+	if err != nil {
+		panic(err)
+	}
+
+	mus.Play(-1)
 
 	return ui
 }
@@ -227,6 +240,12 @@ func init() {
 	if err != nil {
 		panic(err)
 	}
+
+	err = mix.Init(mix.INIT_OGG)
+		if err != nil {
+		panic(err)
+	}
+
 }
 
 func (ui *ui) keyDownOnce(key uint8) bool {
@@ -317,13 +336,17 @@ func (ui *ui) Draw(level *game.Level) {
 
 	limit := 5
 	if level.Player.X > ui.centerX+limit {
-		ui.centerX++
+		diff := level.Player.X - (ui.centerX+limit)
+		ui.centerX += diff
 	} else if level.Player.X < ui.centerX-limit {
-		ui.centerX--
+		diff := (ui.centerX-limit) - level.Player.X
+		ui.centerX -= diff
 	} else if level.Player.Y > ui.centerY+limit {
-		ui.centerY++
+		diff :=  level.Player.Y - (ui.centerY+limit)
+		ui.centerY += diff
 	} else if level.Player.Y < ui.centerY-limit {
-		ui.centerY--
+		diff := (ui.centerY-limit) - level.Player.Y
+		ui.centerY -= diff
 	}
 
 	offsetX := int32((ui.winWidth / 2) - ui.centerX*32)
