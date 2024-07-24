@@ -97,6 +97,15 @@ type Player struct {
 	Character
 }
 
+type GameEvent int
+const(
+	Move GameEvent = iota
+	DoorOpen 
+	Attack
+	Hit
+	Portal
+)
+
 type Level struct {
 	Map      [][]Tile
 	Player   *Player
@@ -105,6 +114,7 @@ type Level struct {
 	Debug    map[Pos]bool
 	Events   []string
 	EventPos int
+	LastEvent GameEvent
 }
 
 func (level *Level) Attack(c1, c2 *Character) {
@@ -424,6 +434,7 @@ func checkDoor(level *Level, pos Pos) {
 	t := level.Map[pos.Y][pos.X]
 	if t.OverlayRune == ClosedDoor {
 		level.Map[pos.Y][pos.X].OverlayRune = OpenDoor
+		level.LastEvent = DoorOpen
 		level.lineOfSight()
 	}
 }
@@ -440,6 +451,7 @@ func (game *Game) Move(to Pos) {
 	} else {
 
 		player.Pos = to
+		level.LastEvent = Move
 		for y, row := range level.Map {
 			for x, _ := range row {
 				level.Map[y][x].Visible = false
@@ -454,6 +466,7 @@ func (game *Game) resolveMovement(pos Pos) {
 	monster, exists := level.Monsters[pos]
 	if exists {
 		level.Attack(&level.Player.Character, &monster.Character)
+		level.LastEvent = Attack
 		if monster.Hitpoints <= 0 {
 			delete(level.Monsters, monster.Pos)
 		}

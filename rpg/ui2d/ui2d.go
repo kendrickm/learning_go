@@ -19,7 +19,19 @@ import (
 
 func f(p unsafe.Pointer) {}
 
+type sounds struct {
+	openingDoors []*mix.Chunk
+	footsteps  []*mix.Chunk
+}
+
+func playRandomSound(chunks []*mix.Chunk, volume int){
+	chunkIndex := rand.Intn(len(chunks))
+	chunks[chunkIndex].Volume(volume)
+	chunks[chunkIndex].Play(-1,0)
+}
+
 type ui struct {
+	sounds sounds
 	winWidth  int
 	winHeight int
 
@@ -108,8 +120,29 @@ func NewUI(inputChan chan *game.Input, levelChan chan *game.Level) *ui {
 	if err != nil {
 		panic(err)
 	}
-
 	mus.Play(-1)
+
+	footstepBase := "ui2d/assets/footstep0"
+	for i := 0; i<10; i++ {
+		footstepFile := footstepBase + strconv.Itoa(i) + ".ogg"
+		footstepSound, err := mix.LoadWAV(footstepFile)
+		if err != nil {
+		panic(err)
+		}
+		ui.sounds.footsteps = append(ui.sounds.footsteps, footstepSound)
+	}
+
+	doorOpen1, err := mix.LoadWAV("ui2d/assets/doorOpen_1.ogg")
+	if err != nil {
+		panic(err)
+	}
+	ui.sounds.openingDoors = append(ui.sounds.openingDoors, doorOpen1)
+
+	doorOpen2, err := mix.LoadWAV("ui2d/assets/doorOpen_2.ogg")
+	if err != nil {
+		panic(err)
+	}
+	ui.sounds.openingDoors = append(ui.sounds.openingDoors, doorOpen2)
 
 	return ui
 }
@@ -295,6 +328,15 @@ func (ui *ui) Run() {
 		select {
 		case newLevel, ok := <-ui.levelChan:
 			if ok {
+				switch newLevel.LastEvent {
+				case game.Move:
+					fmt.Println("Playing footsteps")
+					playRandomSound(ui.sounds.footsteps, 10)
+				case game.DoorOpen:
+					fmt.Println("Playing opening door")
+					playRandomSound(ui.sounds.openingDoors, 32)
+				default:
+				}
 				ui.Draw(newLevel)
 			}
 		default:
@@ -329,6 +371,7 @@ func (ui *ui) Run() {
 }
 
 func (ui *ui) Draw(level *game.Level) {
+	
 	if ui.centerX == -1 && ui.centerY == -1 {
 		ui.centerX = level.Player.X
 		ui.centerY = level.Player.Y
