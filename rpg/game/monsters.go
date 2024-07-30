@@ -14,7 +14,6 @@ func NewRat(p Pos) *Monster {
 	monster.Speed = 2.0
 	monster.ActionPoints = 0.0
 	monster.SightRange = 10
-	monster.Items = append(monster.Items, NewSword(Pos{}))
 	return monster
 }
 
