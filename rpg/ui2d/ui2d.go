@@ -26,6 +26,7 @@ type sounds struct {
 
 func playRandomSound(chunks []*mix.Chunk, volume int){
 	chunkIndex := rand.Intn(len(chunks))
+	fmt.Println("Playing file " + strconv.Itoa(chunkIndex))
 	chunks[chunkIndex].Volume(volume)
 	chunks[chunkIndex].Play(-1,0)
 }
@@ -125,6 +126,7 @@ func NewUI(inputChan chan *game.Input, levelChan chan *game.Level) *ui {
 	footstepBase := "ui2d/assets/footstep0"
 	for i := 0; i<10; i++ {
 		footstepFile := footstepBase + strconv.Itoa(i) + ".ogg"
+		fmt.Println("Loading " + footstepFile)
 		footstepSound, err := mix.LoadWAV(footstepFile)
 		if err != nil {
 		panic(err)
@@ -346,15 +348,14 @@ func (ui *ui) Run() {
 			var input game.Input
 			if ui.keyDownOnce(sdl.SCANCODE_UP) {
 				input.Typ = game.Up
-			}
-			if ui.keyDownOnce(sdl.SCANCODE_DOWN) {
+			} else if ui.keyDownOnce(sdl.SCANCODE_DOWN) {
 				input.Typ = game.Down
-			}
-			if ui.keyDownOnce(sdl.SCANCODE_RIGHT) {
+			} else if ui.keyDownOnce(sdl.SCANCODE_RIGHT) {
 				input.Typ = game.Right
-			}
-			if ui.keyDownOnce(sdl.SCANCODE_LEFT) {
+			} else if ui.keyDownOnce(sdl.SCANCODE_LEFT) {
 				input.Typ = game.Left
+			} else if ui.keyDownOnce(sdl.SCANCODE_T) {
+				input.Typ = game.TakeAll
 			}
 
 			for i, v := range ui.keyboardState {
@@ -423,10 +424,21 @@ func (ui *ui) Draw(level *game.Level) {
 		}
 	}
 	ui.textureAtlas.SetColorMod(255, 255, 255)
+
+	//Render Monsters
 	for pos, monster := range level.Monsters {
 		if level.Map[pos.Y][pos.X].Visible {
 			monsterSrcRect := ui.textureIndex[monster.Rune][0]
 			ui.renderer.Copy(ui.textureAtlas, &monsterSrcRect, &sdl.Rect{X: int32(pos.X)*32 + offsetX, Y: int32(pos.Y)*32 + offsetY, W: 32, H: 32})
+		}
+	}
+	//Render Items
+	for pos, items := range level.Items {
+		if level.Map[pos.Y][pos.X].Visible {
+			for _, item := range items {
+				itemSrcRect := ui.textureIndex[item.Rune][0]
+				ui.renderer.Copy(ui.textureAtlas, &itemSrcRect, &sdl.Rect{X: int32(pos.X)*32 + offsetX, Y: int32(pos.Y)*32 + offsetY, W: 32, H: 32})
+		    }
 		}
 	}
 	playerSrcRect := ui.textureIndex['@'][0]
@@ -452,6 +464,14 @@ func (ui *ui) Draw(level *game.Level) {
 		if i == level.EventPos {
 			break
 		}
+	}// Event UI end
+
+	//Inventory UI
+
+	items := level.Items[level.Player.Pos]
+	for i, item := range items {
+		itemSrcRect := ui.textureIndex[item.Rune][0]
+		ui.renderer.Copy(ui.textureAtlas, &itemSrcRect, &sdl.Rect{X:int32(ui.winWidth-32 -i*32), Y: int32(ui.winHeight-32), W: 32, H: 32})  
 	}
 
 	ui.renderer.Present()

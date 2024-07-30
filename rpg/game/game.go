@@ -41,6 +41,7 @@ const (
 	Down
 	Left
 	Right
+	TakeAll
 	QuitGame
 	CloseWindow
 	Search // Temp
@@ -91,6 +92,7 @@ type Character struct {
 	Speed        float64
 	ActionPoints float64
 	SightRange   int
+	Items []*Item
 }
 
 type Player struct {
@@ -110,11 +112,28 @@ type Level struct {
 	Map      [][]Tile
 	Player   *Player
 	Monsters map[Pos]*Monster
+	Items    map[Pos][]*Item
 	Portal   map[Pos]*LevelPos
 	Debug    map[Pos]bool
 	Events   []string
 	EventPos int
 	LastEvent GameEvent
+}
+
+func (level *Level) MoveItem(itemToMove *Item, character *Character) {
+	fmt.Println("Move Item")
+	pos := character.Pos
+	items := level.Items[pos]
+	for i,item := range items {
+		if item == itemToMove {
+			items = append(items[:i],items[i+1:]...)
+			level.Items[pos] = items
+			character.Items = append(character.Items, item)
+			level.AddEvent(character.Name + " picked up: " + item.Name)
+			return
+		}
+	}
+	panic ("Tried to move an item we were not on top of")
 }
 
 func (level *Level) Attack(c1, c2 *Character) {
@@ -326,6 +345,7 @@ func loadLevels() map[string]*Level {
 
 		level.Map = make([][]Tile, len(levelLines))
 		level.Monsters = make(map[Pos]*Monster)
+		level.Items = make(map[Pos][]*Item)
 		level.Portal = make(map[Pos]*LevelPos)
 
 		for i := range level.Map {
@@ -337,6 +357,7 @@ func loadLevels() map[string]*Level {
 
 			for x, c := range line {
 				var t Tile
+				p := Pos{x,y}
 				t.OverlayRune = Blank
 				switch c {
 				case ' ', '\n', '\t', '\r':
@@ -355,6 +376,13 @@ func loadLevels() map[string]*Level {
 				case 'd':
 					t.Rune = Pending
 					t.OverlayRune = DownStair
+				case 's':
+					t.Rune = Pending
+					level.Items[p] = append(level.Items[p], NewSword(p))
+					level.Items[p] = append(level.Items[p], NewHelmet(p))
+				case 'h':
+					t.Rune = Pending
+					level.Items[p] = append(level.Items[p], NewHelmet(p))
 				case '.':
 					t.Rune = DirtFloor
 				case '@':
@@ -362,10 +390,10 @@ func loadLevels() map[string]*Level {
 					level.Player.Y = y
 					t.Rune = Pending //The tile under this is filled in later
 				case 'R':
-					level.Monsters[Pos{x, y}] = NewRat(Pos{x, y})
+					level.Monsters[p] = NewRat(p)
 					t.Rune = Pending
 				case 'S':
-					level.Monsters[Pos{x, y}] = NewSpider(Pos{x, y})
+					level.Monsters[p] = NewSpider(p)
 					t.Rune = Pending
 				default:
 					panic("Invalid character in map")
@@ -451,6 +479,14 @@ func (game *Game) Move(to Pos) {
 	} else {
 
 		player.Pos = to
+		// items := level.Items[player.Pos]
+		// if len(items) > 0 {
+		// 	level.MoveItem(items[0], &player.Character)
+		// 	fmt.Println("Player Inventory")
+		// 	for _, item := range player.Items {
+		// 		fmt.Println("	",item)
+		// 	}
+		// }
 		level.LastEvent = Move
 		for y, row := range level.Map {
 			for x, _ := range row {
@@ -468,7 +504,8 @@ func (game *Game) resolveMovement(pos Pos) {
 		level.Attack(&level.Player.Character, &monster.Character)
 		level.LastEvent = Attack
 		if monster.Hitpoints <= 0 {
-			delete(level.Monsters, monster.Pos)
+			monster.Kill(level)
+			
 		}
 		if level.Player.Hitpoints <= 0 {
 			panic("you ded")
@@ -497,6 +534,10 @@ func (game *Game) handleInput(input *Input) {
 	case Left:
 		newPos := Pos{p.X - 1, p.Y}
 		game.resolveMovement(newPos)
+	case TakeAll:
+		for _, item := range level.Items[p.Pos] {
+			level.MoveItem(item, &p.Character)
+		}
 	case CloseWindow:
 		close(input.LevelChannel)
 		chanIndex := 0
