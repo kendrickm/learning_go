@@ -53,7 +53,8 @@ type ui struct {
 	fontLarge  *ttf.Font
 	fontSmall  *ttf.Font
 
-	eventBackground *sdl.Texture
+	eventBackground 		  *sdl.Texture
+	groundInventoryBackground *sdl.Texture
 
 	string2TexSmall map[string]*sdl.Texture
 	string2TexMed   map[string]*sdl.Texture
@@ -111,6 +112,10 @@ func NewUI(inputChan chan *game.Input, levelChan chan *game.Level) *ui {
 	}
 
 	ui.eventBackground = ui.GetSinglePixelTex(sdl.Color{0, 0, 0, 128})
+	ui.eventBackground.SetBlendMode(sdl.BLENDMODE_BLEND)
+
+	ui.groundInventoryBackground = ui.GetSinglePixelTex(sdl.Color{255, 0, 0, 128})
+	ui.groundInventoryBackground.SetBlendMode(sdl.BLENDMODE_BLEND)
 
 	err = mix.OpenAudio(22050, mix.DEFAULT_FORMAT,2,4096)
 	if err != nil {
@@ -303,7 +308,7 @@ func (ui *ui) GetSinglePixelTex(color sdl.Color) *sdl.Texture {
 	pixels[2] = color.B
 	pixels[3] = color.A
 
-	tex.Update(nil, unsafe.Pointer(&pixels[0]), 4)
+	tex.Update(nil, unsafe.Pointer(&pixels[3]), 4)
 	err = tex.SetBlendMode(sdl.BLENDMODE_BLEND)
 	if err != nil {
 		panic(err)
@@ -467,7 +472,9 @@ func (ui *ui) Draw(level *game.Level) {
 	}// Event UI end
 
 	//Inventory UI
-
+	groundInvStart := int32(float64(ui.winWidth) * 0.9)
+	groundInvWidth := int32(ui.winWidth) - groundInvStart
+	ui.renderer.Copy(ui.groundInventoryBackground, nil, &sdl.Rect{groundInvStart, int32(ui.winWidth - 32), groundInvWidth, int32(32)})
 	items := level.Items[level.Player.Pos]
 	for i, item := range items {
 		itemSrcRect := ui.textureIndex[item.Rune][0]
