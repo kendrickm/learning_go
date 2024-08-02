@@ -19,6 +19,27 @@ import (
 
 func f(p unsafe.Pointer) {}
 
+type mouseState struct {
+	leftButton  bool
+	rightButton bool
+	pos        game.Pos
+}
+
+func getMouseState() mouseState {
+	mouseX, mouseY, mouseButtonState := sdl.GetMouseState()
+	leftButton := mouseButtonState & sdl.ButtonLMask()
+	rightButton := mouseButtonState & sdl.ButtonRMask()
+
+	var result mouseState
+	result.pos = game.Pos{int(mouseX), int(mouseY)}
+	result.leftButton = !(leftButton == 0)
+	result.rightButton = !(rightButton == 0)
+
+	return result
+}
+
+
+
 type sounds struct {
 	openingDoors []*mix.Chunk
 	footsteps  []*mix.Chunk
@@ -31,7 +52,15 @@ func playRandomSound(chunks []*mix.Chunk, volume int){
 	chunks[chunkIndex].Play(-1,0)
 }
 
+type uiState int
+const (
+	UIMain uiState = iota
+	UIInventory
+)
+
+
 type ui struct {
+	state uiState
 	sounds sounds
 	winWidth  int
 	winHeight int
@@ -63,6 +92,7 @@ type ui struct {
 
 func NewUI(inputChan chan *game.Input, levelChan chan *game.Level) *ui {
 	ui := &ui{}
+	ui.state = UIMain
 	ui.inputChan = inputChan
 	ui.levelChan = levelChan
 	ui.string2TexSmall = make(map[string]*sdl.Texture)
@@ -308,7 +338,7 @@ func (ui *ui) GetSinglePixelTex(color sdl.Color) *sdl.Texture {
 	pixels[2] = color.B
 	pixels[3] = color.A
 
-	tex.Update(nil, unsafe.Pointer(&pixels[3]), 4)
+	tex.Update(nil, unsafe.Pointer(&pixels[0]), 4)
 	err = tex.SetBlendMode(sdl.BLENDMODE_BLEND)
 	if err != nil {
 		panic(err)
@@ -316,7 +346,25 @@ func (ui *ui) GetSinglePixelTex(color sdl.Color) *sdl.Texture {
 	return tex
 }
 
+func (ui *ui) CheckItems(level *game.Level, prevMouseState mouseState, currentMouseState mouseState) *game.Item {
+	if !currentMouseState.leftButton && prevMouseState.leftButton {
+		items := level.Items[level.Player.Pos]
+		mousePos := currentMouseState.pos
+		for i, item := range items {
+			itemRect := ui.getGroundItemRect(i)
+			if itemRect.HasIntersection(&sdl.Rect{int32(mousePos.X), int32(mousePos.Y),int32(1),int32(1)}) {
+				fmt.Println("Selected item")
+				return item
+			}
+		}
+	}
+	return nil
+}
+
 func (ui *ui) Run() {
+
+	prevMouseState := getMouseState()
+	var newLevel  *game.Level
 
 	for {
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
@@ -332,8 +380,11 @@ func (ui *ui) Run() {
 
 			}
 		}
+
+		currentMouseState := getMouseState()
+		var ok bool
 		select {
-		case newLevel, ok := <-ui.levelChan:
+		case newLevel, ok = <-ui.levelChan:
 			if ok {
 				switch newLevel.LastEvent {
 				case game.Move:
@@ -344,13 +395,28 @@ func (ui *ui) Run() {
 					playRandomSound(ui.sounds.openingDoors, 32)
 				default:
 				}
+
 				ui.Draw(newLevel)
+
 			}
 		default:
 		}
 
+		ui.Draw(newLevel)
+		if ui.state == UIInventory {
+			ui.DrawInventory(newLevel)
+		} 
+		ui.renderer.Present()
+	
+		var input game.Input
+		item := ui.CheckItems(newLevel, prevMouseState, currentMouseState)
+		if item != nil {
+			input.Typ = game.TakeItem
+			input.Item = item
+		}
+
 		if sdl.GetKeyboardFocus() == ui.window || sdl.GetMouseFocus() == ui.window {
-			var input game.Input
+			
 			if ui.keyDownOnce(sdl.SCANCODE_UP) {
 				input.Typ = game.Up
 			} else if ui.keyDownOnce(sdl.SCANCODE_DOWN) {
@@ -361,6 +427,13 @@ func (ui *ui) Run() {
 				input.Typ = game.Left
 			} else if ui.keyDownOnce(sdl.SCANCODE_T) {
 				input.Typ = game.TakeAll
+			} else if ui.keyDownOnce(sdl.SCANCODE_I) {
+				fmt.Println("Changing ui state")
+				if ui.state == UIMain {
+					ui.state = UIInventory
+				} else {
+					ui.state = UIMain
+				}
 			}
 
 			for i, v := range ui.keyboardState {
@@ -371,9 +444,15 @@ func (ui *ui) Run() {
 				ui.inputChan <- &input
 			}
 		}
+		prevMouseState = currentMouseState
 		sdl.Delay(10)
 	}
 
+}
+
+func (ui *ui) DrawInventory(level *game.Level) {
+	ui.renderer.Copy(ui.groundInventoryBackground, nil, &sdl.Rect{X:int32(100), Y: int32(100), W: int32(500), H: int32(500)})
+	// ui.renderer.Present()
 }
 
 func (ui *ui) Draw(level *game.Level) {
@@ -472,15 +551,21 @@ func (ui *ui) Draw(level *game.Level) {
 	}// Event UI end
 
 	//Inventory UI
-	groundInvStart := int32(float64(ui.winWidth) * 0.9)
+	groundInvStart := int32(float64(ui.winWidth) * .9)
 	groundInvWidth := int32(ui.winWidth) - groundInvStart
-	ui.renderer.Copy(ui.groundInventoryBackground, nil, &sdl.Rect{groundInvStart, int32(ui.winWidth - 32), groundInvWidth, int32(32)})
+	ui.renderer.Copy(ui.groundInventoryBackground, nil, &sdl.Rect{X:groundInvStart, Y: int32(ui.winHeight - 32), W: groundInvWidth, H: int32(32)})
 	items := level.Items[level.Player.Pos]
 	for i, item := range items {
 		itemSrcRect := ui.textureIndex[item.Rune][0]
-		ui.renderer.Copy(ui.textureAtlas, &itemSrcRect, &sdl.Rect{X:int32(ui.winWidth-32 -i*32), Y: int32(ui.winHeight-32), W: 32, H: 32})  
+		ui.renderer.Copy(ui.textureAtlas, &itemSrcRect, ui.getGroundItemRect(i))  
 	}
 
-	ui.renderer.Present()
+	//Inventory UI End
 
+	// ui.renderer.Present()
+
+}
+
+func (ui *ui) getGroundItemRect(i int) *sdl.Rect {
+	return &sdl.Rect{X:int32(ui.winWidth-32 -i*32), Y: int32(ui.winHeight-32), W: 32, H: 32}
 }
