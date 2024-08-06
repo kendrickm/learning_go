@@ -45,6 +45,7 @@ const (
 	QuitGame
 	CloseWindow
 	TakeItem
+	DropItem
 	Search // Temp
 )
 
@@ -109,6 +110,7 @@ const(
 	Hit
 	Portal
 	Pickup
+	Drop
 )
 
 type Level struct {
@@ -121,6 +123,19 @@ type Level struct {
 	Events   []string
 	EventPos int
 	LastEvent GameEvent
+}
+
+func (level *Level) DropItem(itemToDrop *Item, character *Character) {
+	pos := character.Pos
+	items := character.Items
+	for i,item := range items {
+		if item == itemToDrop {
+			character.Items = append(character.Items[:i],character.Items[i+1:]...)
+			level.Items[pos] = append(level.Items[pos], item)
+			level.AddEvent(character.Name + " dropped: " + item.Name)
+			return
+		}
+	}
 }
 
 func (level *Level) MoveItem(itemToMove *Item, character *Character) {
@@ -540,6 +555,10 @@ func (game *Game) handleInput(input *Input) {
 	case TakeItem:
 		level.MoveItem(input.Item, &level.Player.Character)
 		level.LastEvent = Pickup
+	case DropItem:
+		level.DropItem(input.Item, &level.Player.Character)
+		level.LastEvent = Drop
+
 	case TakeAll:
 		for _, item := range level.Items[p.Pos] {
 			level.MoveItem(item, &p.Character)
