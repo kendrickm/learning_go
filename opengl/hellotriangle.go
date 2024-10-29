@@ -32,10 +32,12 @@ func main() {
 
 	fmt.Println("OpenGL Version", gogl.GetVersion())
 
-	shaderProgram, err := gogl.NewShader("shaders/hello.vert", "shaders/hello.frag")
+	shaderProgram, err := gogl.NewShader("shaders/hello.vert", "shaders/quadtexture.frag")
 	if err != nil {
 		panic (err)
 	}
+
+	texture := gogl.LoadTextureAlpha("assets/tex.png")
 
 	verticies := []float32{
 		0.5,0.5,0.0,     1.0,1.0,
@@ -63,7 +65,6 @@ func main() {
 	gogl.UnbindVertexArray()
 
 	var x float32 = 0.0
-
 	for {
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 			switch event.(type) {
@@ -77,6 +78,8 @@ func main() {
 		shaderProgram.Use()
 		shaderProgram.SetFloat("x",x)
 		shaderProgram.SetFloat("y",0)
+		gogl.BindTexture(texture)
+
 		gogl.BindVertexArray(VAO)
 		gl.DrawElements(gl.TRIANGLES,6,gl.UNSIGNED_INT,gl.PtrOffset(0))
 		window.GLSwap()
