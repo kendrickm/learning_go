@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 	"github.com/go-gl/gl/v3.3-core/gl"
+	"github.com/go-gl/mathgl/mgl32"
 )
 
 type Shader struct{
@@ -21,7 +22,16 @@ func NewShader(vertexPath string, fragmentPath string) (*Shader, error) {
 	if err != nil {
 		return nil, err
 	}
-	result := &Shader{id, vertexPath, fragmentPath, getModifiedTime(vertexPath), getModifiedTime(fragmentPath)}
+
+	vertextModTime,err := getModifiedTime(vertexPath)
+	if err != nil {
+		return nil, err
+	}
+	fragmentModTime,err := getModifiedTime(fragmentPath)
+	if err != nil {
+		return nil, err
+	}
+	result := &Shader{id, vertexPath, fragmentPath, vertextModTime, fragmentModTime}
 	return result, nil
 }
 
@@ -37,18 +47,31 @@ func (shader *Shader) SetFloat(name string, f float32){
 	gl.Uniform1f(location,f)
 }
 
-func getModifiedTime(filePath string) time.Time {
-		file, err := os.Stat(filePath)
-		if err != nil {
-			panic(err)
-		}
-
-		return file.ModTime()
+func (shader *Shader) SetMat4(name string, mat mgl32.Mat4) {
+	name_cstr := gl.Str(name+"\x00")
+	location := gl.GetUniformLocation(uint32(shader.id),name_cstr)
+	m4 := [16]float32(mat)
+	gl.UniformMatrix4fv(location,1,false,&m4[0])
 }
 
-func (shader *Shader)CheckShaderForChanges() {
-		vertextModTime := getModifiedTime(shader.vertexPath)
-		fragmentModTime := getModifiedTime(shader.fragmentPath)
+func getModifiedTime(filePath string) (time.Time, error) {
+		file, err := os.Stat(filePath)
+		if err != nil {
+			return time.Time{}, err
+		}
+
+		return file.ModTime(), nil
+}
+
+func (shader *Shader)CheckShaderForChanges() error {
+		vertextModTime,err := getModifiedTime(shader.vertexPath)
+		if err != nil {
+			return err
+		}
+		fragmentModTime,err := getModifiedTime(shader.fragmentPath)
+		if err != nil {
+			return err
+		}
 		if !vertextModTime.Equal(shader.vertextModified) || 
 		    !fragmentModTime.Equal(shader.fragmentModified) {
 		    	id, err := CreateProgram(shader.vertexPath, shader.fragmentPath)
@@ -60,4 +83,6 @@ func (shader *Shader)CheckShaderForChanges() {
 
 		    	}
 		    }
+
+		    return nil
 }
