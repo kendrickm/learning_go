@@ -6,6 +6,7 @@ import (
 "fmt"
 "github.com/kendrickm/learning_go/gogl"
 "github.com/go-gl/mathgl/mgl32"
+"time"
 )
 
 const winWidth = 1080
@@ -30,6 +31,7 @@ func main() {
 	defer window.Destroy()
 
 	gl.Init()
+	gl.Enable(gl.DEPTH_TEST)
 
 	fmt.Println("OpenGL Version", gogl.GetVersion())
 
@@ -38,7 +40,7 @@ func main() {
 		panic (err)
 	}
 
-	texture := gogl.LoadTextureAlpha("assets/tex.png")
+	texture := gogl.LoadTextureAlpha("assets/metalbox_full.png")
 
 	verticies := []float32{
 		-0.5, -0.5, -0.5, 0.0, 0.0,
@@ -102,10 +104,14 @@ func main() {
 	gogl.UnbindVertexArray()
 
 	keyboardState := sdl.GetKeyboardState()
-	var x float32 
-	var z float32
 
+	position := mgl32.Vec3{0.0,0.0,3.0}
+	worldUp := mgl32.Vec3{0.0,1.0,0.0}
+	camera := gogl.NewCamera(position, worldUp, 0.0, 0.0, .25,0.1)
+	var elapsedTime float32
+	prevMouseX, prevMouseY, _ := sdl.GetMouseState()
 	for {
+		frameStart := time.Now()
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
 			switch event.(type) {
 			case *sdl.QuitEvent:
@@ -113,28 +119,32 @@ func main() {
 			}
 		}
 
-		gl.ClearColor(0.0,0.0,0.0,0.0)
-		gl.Clear(gl.COLOR_BUFFER_BIT)
 
+
+		var dir gogl.Direction
 		if keyboardState[sdl.SCANCODE_LEFT] != 0 {
-			x = x-.01
+			dir = gogl.Left
 		}
 
 		if keyboardState[sdl.SCANCODE_RIGHT] != 0 {
-			x = x+.01
+			dir = gogl.Right
 		}
 		if keyboardState[sdl.SCANCODE_UP] != 0  {
-			z = z+.01
+			dir = gogl.Forward
 		}
 		if keyboardState[sdl.SCANCODE_DOWN] != 0  {
-			z = z-.01
+			dir = gogl.Backward
 		}
+		mouseX, mouseY, _ := sdl.GetMouseState()
+		camera.UpdateCamera(dir,elapsedTime,float32(mouseX - prevMouseX), float32(mouseY-prevMouseY))
 		
+		gl.ClearColor(0.0,0.0,0.0,0.0)
+		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 		shaderProgram.Use()
 
 		projectionMatrix := mgl32.Perspective(mgl32.DegToRad(45.0),float32(winWidth)/float32(winHeight),0.1,100.0)
-		viewMatrix := mgl32.Ident4()
-		viewMatrix = mgl32.Translate3D(x, 0.0, z)
+		viewMatrix := camera.GetViewMatrix()
+		// viewMatrix = mgl32.Translate3D(x, 0.0, z)
 		shaderProgram.SetMat4("projection",projectionMatrix)
 		shaderProgram.SetMat4("view",viewMatrix)
 
@@ -152,6 +162,9 @@ func main() {
 
 		window.GLSwap()
 		shaderProgram.CheckShaderForChanges()
+		elapsedTime = float32(time.Since(frameStart).Seconds() * 1000)
+		prevMouseX = mouseX
+		prevMouseY = mouseY
 
 	}
 }
