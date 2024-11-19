@@ -9,7 +9,7 @@ import (
 "time"
 )
 
-const winWidth = 1080
+const winWidth = 720
 const winHeight = 720
 
 func main() {
@@ -23,6 +23,7 @@ func main() {
 	sdl.GLSetAttribute(sdl.GL_CONTEXT_PROFILE_MASK, sdl.GL_CONTEXT_PROFILE_CORE)
 
 	window,err := sdl.CreateWindow("Hello Triangle", 200,200, winWidth, winHeight,sdl.WINDOW_OPENGL)
+	sdl.SetRelativeMouseMode(true)
 	if err != nil {
 		panic(err)
 	}
@@ -85,29 +86,53 @@ func main() {
 		-0.5, 0.5, 0.5, 0.0, 0.0,
 		-0.5, 0.5, -0.5, 0.0, 1.0}
 
+	normals := make([]float32, 36*3)
+	for tri := 0; tri< 12; tri++ {
+		index := tri * 15
+		p1 := mgl32.Vec3{verticies[index],verticies[index+1],verticies[index+2]}
+		index += 5
+		p2 := mgl32.Vec3{verticies[index],verticies[index+1],verticies[index+2]}
+		index += 5
+		p3 := mgl32.Vec3{verticies[index],verticies[index+1],verticies[index+2]}
+
+		normal := gogl.TriangleNormal(p1,p2,p3)
+
+		normals[tri*9] = normal.X()
+		normals[tri*9+1] = normal.Y()
+		normals[tri*9+2] = normal.Z()
+
+		normals[tri*9+3] = normal.X()
+		normals[tri*9+5] = normal.Y()
+		normals[tri*9+6] = normal.Z()
+
+		normals[tri*9+6] = normal.X()
+		normals[tri*9+7] = normal.Y()
+		normals[tri*9+8] = normal.Z()
+	}
+
 	cubePositions := []mgl32.Vec3{
 		mgl32.Vec3{0.0,0.0,0.0},
 		mgl32.Vec3{2.0,5.0,-10.0},
 		mgl32.Vec3{1.0,-5.0,1.0}}
 
+    VAO := gogl.GenBindVertexArray()	
 	gogl.GenBindBuffer(gl.ARRAY_BUFFER)
-
-	VAO := gogl.GenBindVertexArray()
-	
 	gogl.BufferDataFloat(gl.ARRAY_BUFFER, verticies, gl.STATIC_DRAW)
-
-
 	gl.VertexAttribPointer(0,3,gl.FLOAT,false,5*4,nil)
 	gl.EnableVertexAttribArray(0)
 	gl.VertexAttribPointer(1,2,gl.FLOAT,false,5*4, gl.PtrOffset(3*4))
 	gl.EnableVertexAttribArray(1)
+	gogl.GenBindBuffer(gl.ARRAY_BUFFER)
+	gogl.BufferDataFloat(gl.ARRAY_BUFFER,normals,gl.STATIC_DRAW)
+	gl.VertexAttribPointer(2,3,gl.FLOAT,false,3*4,nil)
+	gl.EnableVertexAttribArray(2)
 	gogl.UnbindVertexArray()
 
 	keyboardState := sdl.GetKeyboardState()
 
 	position := mgl32.Vec3{0.0,0.0,3.0}
 	worldUp := mgl32.Vec3{0.0,1.0,0.0}
-	camera := gogl.NewCamera(position, worldUp, 0.0, 0.0, .25,0.1)
+	camera := gogl.NewCamera(position, worldUp, 0.0, 0.0, .15, 0.1)
 	var elapsedTime float32
 	prevMouseX, prevMouseY, _ := sdl.GetMouseState()
 	for {
@@ -147,6 +172,8 @@ func main() {
 		// viewMatrix = mgl32.Translate3D(x, 0.0, z)
 		shaderProgram.SetMat4("projection",projectionMatrix)
 		shaderProgram.SetMat4("view",viewMatrix)
+		shaderProgram.SetVec3("lightPos", mgl32.Vec3{2.0,5.0,5.0})
+		shaderProgram.SetVec3("lightColor",mgl32.Vec3{1.0,1.0,1.0})
 
 		gogl.BindTexture(texture)
 		gogl.BindVertexArray(VAO)
