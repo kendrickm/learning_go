@@ -55,10 +55,10 @@ func (shader *Shader) SetMat4(name string, mat mgl32.Mat4) {
 }
 
 func (shader *Shader) SetVec3(name string, v mgl32.Vec3) {
-	name_cstr := gl.Str(name+"\x00")
-	location := gl.GetUniformLocation(uint32(shader.id),name_cstr)
+	name_cstr := gl.Str(name + "\x00")
+	location := gl.GetUniformLocation(uint32(shader.id), name_cstr)
 	v3 := [3]float32(v)
-	gl.Uniform3fv(location,1,&v3[0])
+	gl.Uniform3fv(location, 1, &v3[0])
 }
 
 func getModifiedTime(filePath string) (time.Time, error) {

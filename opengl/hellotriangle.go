@@ -111,9 +111,9 @@ func main() {
 	}
 
 	cubePositions := []mgl32.Vec3{
-		mgl32.Vec3{0.0,0.0,0.0},
-		mgl32.Vec3{2.0,5.0,-10.0},
-		mgl32.Vec3{1.0,-5.0,1.0}}
+		mgl32.Vec3{0.0, 0.0, 0.0},
+		mgl32.Vec3{2.0, 5.0, -10.0},
+		mgl32.Vec3{1.0, -5.0, 1.0}}
 
     VAO := gogl.GenBindVertexArray()	
 	gogl.GenBindBuffer(gl.ARRAY_BUFFER)
@@ -130,17 +130,23 @@ func main() {
 
 	keyboardState := sdl.GetKeyboardState()
 
-	position := mgl32.Vec3{0.0,0.0,3.0}
-	worldUp := mgl32.Vec3{0.0,1.0,0.0}
-	camera := gogl.NewCamera(position, worldUp, 0.0, 0.0, .15, 0.1)
+	position := mgl32.Vec3{0.0, 0.0, 0.0}
+	worldUp := mgl32.Vec3{0.0, 1.0, 0.0}
+
+	camera := gogl.NewCamera(position, worldUp, -90.0, 0.0, 0.005, 0.1)
 	var elapsedTime float32
-	prevMouseX, prevMouseY, _ := sdl.GetMouseState()
+	var mouseX, mouseY int32
 	for {
 		frameStart := time.Now()
+		mouseX = 0
+		mouseY = 0
 		for event := sdl.PollEvent(); event != nil; event = sdl.PollEvent() {
-			switch event.(type) {
+			switch e := event.(type) {
 			case *sdl.QuitEvent:
 				return
+			case *sdl.MouseMotionEvent:
+				mouseX += e.XRel
+				mouseY += e.YRel
 			}
 		}
 
@@ -160,8 +166,7 @@ func main() {
 		if keyboardState[sdl.SCANCODE_DOWN] != 0  {
 			dir = gogl.Backward
 		}
-		mouseX, mouseY, _ := sdl.GetMouseState()
-		camera.UpdateCamera(dir,elapsedTime,float32(mouseX - prevMouseX), float32(mouseY-prevMouseY))
+		camera.UpdateCamera(dir,elapsedTime,float32(mouseX), float32(mouseY))
 		
 		gl.ClearColor(0.0,0.0,0.0,0.0)
 		gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
@@ -172,8 +177,10 @@ func main() {
 		// viewMatrix = mgl32.Translate3D(x, 0.0, z)
 		shaderProgram.SetMat4("projection",projectionMatrix)
 		shaderProgram.SetMat4("view",viewMatrix)
-		shaderProgram.SetVec3("lightPos", mgl32.Vec3{2.0,5.0,5.0})
+		shaderProgram.SetVec3("lightPos", mgl32.Vec3{0.0, 0.0,1.0})
 		shaderProgram.SetVec3("lightColor",mgl32.Vec3{1.0,1.0,1.0})
+		// shaderProgram.SetVec3("ambientLight",mgl32.Vec3{0.3,0.3,.3})
+		shaderProgram.SetVec3("viewPos", camera.Position)
 
 		gogl.BindTexture(texture)
 		gogl.BindVertexArray(VAO)
@@ -190,8 +197,7 @@ func main() {
 		window.GLSwap()
 		shaderProgram.CheckShaderForChanges()
 		elapsedTime = float32(time.Since(frameStart).Seconds() * 1000)
-		prevMouseX = mouseX
-		prevMouseY = mouseY
+
 
 	}
 }
